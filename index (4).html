@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Silver Creek High School – Campus Wayfinder</title>
+<style>
+:root{
+  --bg:#f3f5f8; --card:#ffffff; --ink:#1b1f24; --muted:#5a6572; --line:#d8dee6;
+  --accent:#1a5fd1; --accent-ink:#ffffff; --start:#1e9e4a; --end:#d93636; --chip:#eef2f8;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11151a; --card:#1b2129; --ink:#e8edf3; --muted:#9aa6b3; --line:#303843;
+    --accent:#6aa5ff; --accent-ink:#0b1220; --chip:#242c36;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11151a; --card:#1b2129; --ink:#e8edf3; --muted:#9aa6b3; --line:#303843;
+  --accent:#6aa5ff; --accent-ink:#0b1220; --chip:#242c36;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.app{max-width:1320px;margin:0 auto;padding:16px}
+header h1{font-size:1.45rem;line-height:1.2;margin:0 0 4px}
+header p{margin:0;color:var(--muted)}
+.layout{display:grid;gap:14px;margin-top:14px;grid-template-columns:minmax(0,1fr);
+  grid-template-areas:"controls" "map" "steps"}
+@media (min-width:980px){
+  .layout{grid-template-columns:370px minmax(0,1fr);grid-template-areas:"controls map" "steps map";align-items:start}
+  .mapcard{position:sticky;top:12px}
+}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.controls{grid-area:controls}.mapcard{grid-area:map}.stepscard{grid-area:steps}
+label{display:flex;align-items:center;gap:8px;font-weight:650;font-size:.92rem;margin:12px 0 5px}
+label:first-of-type{margin-top:0}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.dot.s{background:var(--start)}.dot.e{background:var(--end)}
+select{width:100%;padding:12px 10px;font-size:1rem;border-radius:10px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink)}
+select:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btnrow{display:flex;gap:8px;margin-top:12px}
+button{font:inherit;cursor:pointer}
+.btn{flex:1;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--chip);color:var(--ink);font-weight:600}
+.btn:hover{border-color:var(--accent)}
+.tap{margin:12px 0 0;font-size:.88rem;color:var(--muted)}
+.tap b{color:var(--ink)}
+.mapwrap{position:relative;height:min(70vh,640px);min-height:340px;background:#fff;border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+@media (min-width:980px){.mapwrap{height:min(82vh,860px)}}
+#map{display:block;width:100%;height:100%;cursor:grab}
+#map.dragging{cursor:grabbing}
+.zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:42px;height:42px;border-radius:10px;border:1px solid #c5ccd6;background:#fff;color:#1b1f24;
+  font-size:1.2rem;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center}
+.zoom button.txt{font-size:.68rem;line-height:1.05;font-weight:700;padding:0 2px;text-align:center}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:.85rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:22px;height:5px;border-radius:3px;background:#1a5fd1}
+.lg{display:inline-block;border-radius:50%}
+.lg.door{width:9px;height:9px;background:#111;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px var(--line)}
+.lg.stair{width:16px;height:10px;border-radius:2px;background:#ffd84d;border:1.5px solid #8a6d00}
+.lg.ent{width:11px;height:11px;background:#7c4dff;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px var(--line)}
+.stepscard h2{font-size:1.05rem;margin:0 0 4px}
+.summary{margin:0 0 8px;color:var(--muted);font-size:.9rem}
+ol#steps{list-style:none;counter-reset:s;margin:0;padding:0}
+ol#steps li{counter-increment:s;position:relative;padding:9px 0 9px 40px;border-top:1px solid var(--line)}
+ol#steps li:first-child{border-top:0}
+ol#steps li::before{content:counter(s);position:absolute;left:0;top:9px;width:28px;height:28px;border-radius:50%;
+  background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center}
+ol#steps li.arrive::before{content:"\2713";background:var(--end);color:#fff}
+.empty{color:var(--muted);margin:0}
+.note{font-size:.8rem;color:var(--muted);margin:10px 0 0}
+.err{color:#c62828}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .err{color:#ff8a80}}
+/* map overlay */
+.hit{fill:rgba(0,0,0,0);cursor:pointer}
+.hit:hover{fill:rgba(26,95,209,.2)}
+.hit.from{fill:rgba(30,158,74,.38)}
+.hit.to{fill:rgba(217,54,54,.34)}
+.arrow{fill:#fff;stroke:#0d3b91;stroke-width:.8;animation:flow 1.9s ease-in-out infinite}
+@keyframes flow{0%,100%{opacity:.3}50%{opacity:1}}
+.ring{fill:none;stroke:#d93636;stroke-width:3;transform-box:fill-box;transform-origin:center;animation:ping 1.8s ease-out infinite}
+@keyframes ping{0%{transform:scale(.7);opacity:.9}100%{transform:scale(2.4);opacity:0}}
+@media (prefers-reduced-motion: reduce){.arrow,.ring{animation:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Silver Creek High School – Campus Wayfinder</h1>
+    <p>Choose where you are and where you’re going, and we’ll draw the way on the map.</p>
+  </header>
+
+  <div class="layout">
+    <section class="card controls" aria-label="Choose your route">
+      <label for="from"><span class="dot s"></span> Starting class / location</label>
+      <select id="from"></select>
+      <label for="to"><span class="dot e"></span> Ending class / location</label>
+      <select id="to"></select>
+      <div class="btnrow">
+        <button class="btn" id="swap" type="button">⇅ Swap</button>
+        <button class="btn" id="clear" type="button">Clear</button>
+      </div>
+      <p class="tap" id="tapHint" aria-live="polite"></p>
+    </section>
+
+    <section class="card mapcard" aria-label="Campus map">
+      <div class="mapwrap" id="mapwrap">
+        <svg id="map" xmlns="http://www.w3.org/2000/svg" viewBox="30 20 1400 1110" role="img" aria-label="Campus map">
+          <rect x="-200" y="-200" width="1900" height="1600" fill="#ffffff"/>
+          <g id="base"><path d="M233.0 109.0 L233.0 163.0 L154.0 163.0 L154.0 210.0 L239.0 210.0 L239.0 209.0 L291.0 209.0 L291.0 36.0 L240.0 36.0 L240.0 35.0 L153.0 35.0 L153.0 109.0 L233.0 109.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M390.0 98.0 L390.0 196.0 L667.0 196.0 L667.0 98.0 L390.0 98.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M52.0 496.0 L122.0 496.0 L122.0 464.0 L180.0 464.0 L180.0 260.0 L164.0 260.0 L164.0 229.0 L110.0 229.0 L110.0 260.0 L52.0 260.0 L52.0 496.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M497.0 242.0 L331.0 242.0 L331.0 338.0 L497.0 338.0 L497.0 298.0 L452.0 298.0 L452.0 285.0 L497.0 285.0 L497.0 242.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M565.0 312.0 L617.0 312.0 L617.0 368.0 L567.0 368.0 L567.0 441.0 L650.0 441.0 L650.0 379.0 L664.0 379.0 L664.0 425.0 L716.0 425.0 L716.0 380.0 L717.0 380.0 L717.0 330.0 L716.0 330.0 L716.0 260.0 L650.0 260.0 L650.0 235.0 L565.0 235.0 L565.0 312.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M860.0 223.0 L765.0 223.0 L765.0 401.0 L860.0 401.0 L860.0 223.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M368.0 377.0 L220.0 377.0 L220.0 473.0 L368.0 473.0 L368.0 377.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M998.0 334.0 L892.0 334.0 L892.0 436.0 L929.0 436.0 L929.0 421.0 L951.0 421.0 L951.0 436.0 L983.0 436.0 L983.0 409.0 L974.0 409.0 L974.0 396.0 L998.0 396.0 L998.0 334.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M521.0 695.0 L636.0 695.0 L636.0 559.0 L654.0 559.0 L654.0 491.0 L521.0 491.0 L521.0 695.0 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M359.0 994.4 L227.0 1022.5 L244.1 1102.6 L333.0 1083.8 L333.0 1104.0 L607.0 1104.0 L607.0 1003.0 L360.9 1003.0 L359.0 994.4 Z" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><path d="M128 532 L69 532 L69 706 L88 706 L88 801 L221 801 L221 686 M221 648 L221 532 L172 532" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="miter"/><rect x="159" y="41" width="75" height="62" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="239" y="42" width="46" height="83" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="262.0" y="83.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">M2</text><rect x="239" y="130" width="46" height="73" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="262.0" y="166.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">M1</text><rect x="160" y="169" width="73" height="35" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="196.5" y="186.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Rec Center</text><rect x="396" y="104" width="27" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="409.5" y="123.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D1</text><rect x="428" y="104" width="33" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="444.5" y="123.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D2</text><rect x="467" y="104" width="35" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="484.5" y="123.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D3</text><rect x="507" y="104" width="33" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="523.5" y="123.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D4</text><rect x="545" y="104" width="39" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="564.5" y="123.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D5</text><rect x="589" y="104" width="33" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="605.5" y="123.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D6</text><rect x="626" y="104" width="35" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="643.5" y="123.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D7</text><rect x="396" y="149" width="27" height="41" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="428" y="149" width="34" height="41" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="445.0" y="169.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D13</text><rect x="467" y="149" width="35" height="41" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="484.5" y="169.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D12</text><rect x="507" y="149" width="33" height="41" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="523.5" y="169.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D11</text><rect x="545" y="149" width="39" height="41" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="564.5" y="169.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D10</text><rect x="589" y="149" width="33" height="41" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="605.5" y="169.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D9</text><rect x="626" y="149" width="35" height="41" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="643.5" y="169.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">D8</text><rect x="337" y="248" width="45" height="42" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="359.5" y="269.0" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">C1</text><rect x="387" y="248" width="54" height="42" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="414.0" y="269.0" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">C2</text><rect x="445" y="248" width="46" height="31" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="468.0" y="263.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">C3</text><rect x="337" y="294" width="45" height="38" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="359.5" y="313.0" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">C8</text><rect x="387" y="294" width="40" height="38" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="407.0" y="313.0" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">C7</text><rect x="432" y="295" width="14" height="37" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="452" y="304" width="39" height="28" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="471.5" y="318.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">C5</text><rect x="571" y="241" width="34" height="29" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="588.0" y="255.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E13</text><rect x="611" y="241" width="33" height="29" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="627.5" y="255.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E14</text><rect x="648" y="266" width="62" height="40" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="679.0" y="286.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E1</text><rect x="571" y="275" width="34" height="31" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="588.0" y="290.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E12</text><rect x="611" y="275" width="33" height="31" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="627.5" y="290.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E11</text><rect x="670" y="296" width="40" height="35" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="690.0" y="313.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E2</text><rect x="623" y="310" width="43" height="63" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="644.5" y="341.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E10</text><rect x="670" y="336" width="41" height="38" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="690.5" y="355.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E3</text><rect x="573" y="374" width="32" height="29" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="589.0" y="388.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E8</text><rect x="609" y="374" width="35" height="29" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="626.5" y="388.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E9</text><rect x="670" y="379" width="40" height="40" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="690.0" y="399.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E4</text><rect x="573" y="408" width="32" height="27" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="589.0" y="421.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E7</text><rect x="609" y="408" width="35" height="27" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="626.5" y="421.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">E6</text><rect x="771" y="229" width="39" height="38" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="790.5" y="248.0" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">T7</text><rect x="814" y="229" width="40" height="38" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="834.0" y="248.0" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">T8</text><rect x="771" y="272" width="39" height="43" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="790.5" y="293.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">T5</text><rect x="814" y="272" width="40" height="43" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="834.0" y="293.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">T6</text><rect x="771" y="320" width="39" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="790.5" y="339.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">T3</text><rect x="815" y="320" width="39" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="834.5" y="339.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">T4</text><rect x="771" y="364" width="39" height="31" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="790.5" y="379.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">T1</text><rect x="814" y="364" width="40" height="31" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="834.0" y="379.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">T2</text><rect x="226" y="383" width="38" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="245.0" y="402.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">B1</text><rect x="269" y="383" width="42" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="290.0" y="402.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">B2</text><rect x="316" y="383" width="46" height="29" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="339.0" y="397.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">B3</text><rect x="226" y="427" width="38" height="40" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="245.0" y="447.0" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">B7</text><rect x="269" y="427" width="42" height="40" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="290.0" y="447.0" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">B6</text><rect x="316" y="417" width="46" height="16" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="316" y="438" width="46" height="29" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="339.0" y="452.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">B5</text><rect x="430" y="395" width="110" height="26" fill="#e9e9e9" stroke="#111" stroke-width="2"/><rect x="898" y="340" width="41" height="60" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="898" y="400" width="25" height="30" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="918.5" y="385" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">N3</text><rect x="933" y="340" width="59" height="50" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="933" y="390" width="35" height="25" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="957" y="415" width="20" height="15" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="963" y="370" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">N4</text><text x="915" y="320" font-size="8" font-weight="400" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Weight Room</text><text x="1030" y="320" font-size="8" font-weight="400" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Fitness Center</text><rect x="1232" y="285" width="83" height="208" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="1273" y="340" font-size="15" font-weight="700" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">P</text><text x="1273" y="375.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Boys&#x27;</text><text x="1273" y="388.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Locker</text><text x="1273" y="401.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Room</text><rect x="1232" y="652" width="83" height="194" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="1273" y="700" font-size="15" font-weight="700" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Q</text><text x="1273" y="735.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Girls&#x27;</text><text x="1273" y="748.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Locker</text><text x="1273" y="761.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Room</text><rect x="980" y="488" width="68" height="140" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="1014" y="505" font-size="14" font-weight="700" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">O</text><text x="1014" y="538.5" font-size="13" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Small</text><text x="1014" y="551.5" font-size="13" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Gym</text><rect x="1048" y="488" width="182" height="217" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="1139" y="588.5" font-size="16" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Main</text><text x="1139" y="601.5" font-size="16" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Gym</text><rect x="840" y="488" width="65" height="195" fill="#d9d9d9" stroke="#111" stroke-width="2"/><g transform="rotate(-90 872 585)"><text x="872" y="585" font-size="13" font-weight="700" fill="#333" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Overhang</text></g><rect x="1305" y="505" width="95" height="50" fill="#d9d9d9" stroke="#111" stroke-width="2"/><text x="1352" y="523.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Lap</text><text x="1352" y="536.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Pool</text><rect x="1305" y="558" width="95" height="50" fill="#d9d9d9" stroke="#111" stroke-width="2"/><text x="1352" y="576.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Diving</text><text x="1352" y="589.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Pool</text><rect x="1300" y="500" width="112" height="150" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="6,4"/><rect x="58" y="266" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="87.0" y="282.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L7</text><rect x="58" y="298" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="87.0" y="314.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L6</text><rect x="58" y="330" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="87.0" y="346.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L5</text><rect x="58" y="362" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="87.0" y="378.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L4</text><rect x="58" y="394" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="87.0" y="410.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L3</text><rect x="58" y="426" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="87.0" y="442.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L2</text><rect x="58" y="458" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="87.0" y="474.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L1</text><rect x="116" y="235" width="42" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="137.0" y="251.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L9</text><rect x="116" y="266" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="145.0" y="282.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L10</text><rect x="116" y="298" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="145.0" y="314.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L11</text><rect x="116" y="330" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="145.0" y="346.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L12</text><rect x="116" y="362" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="145.0" y="378.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L13</text><rect x="116" y="394" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="145.0" y="410.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L14</text><rect x="116" y="426" width="58" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="145.0" y="442.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">L15</text><rect x="77" y="562" width="49" height="29" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="101.5" y="576.5" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K104</text><rect x="153" y="555" width="46" height="34" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="176.0" y="572.0" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K105</text><rect x="76" y="595" width="51" height="31" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="101.5" y="610.5" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K204</text><rect x="152" y="595" width="48" height="31" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="176.0" y="610.5" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K205</text><rect x="77" y="632" width="49" height="34" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="101.5" y="649.0" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K103</text><rect x="76" y="672" width="51" height="31" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="101.5" y="687.5" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K203</text><rect x="94" y="711" width="56" height="37" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="122.0" y="729.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K102</text><rect x="156" y="709" width="57" height="39" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="184.5" y="728.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K101</text><rect x="93" y="755" width="58" height="37" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="122.0" y="773.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K202</text><rect x="155" y="754" width="58" height="38" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="184.0" y="773.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">K201</text><rect x="263" y="549" width="111" height="109" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="318" y="585" font-size="13" font-weight="700" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">A</text><text x="318" y="610" font-size="15" font-weight="700" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Library</text><rect x="326" y="618" width="40" height="22" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="346" y="624.5" font-size="7" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Book</text><text x="346" y="633.5" font-size="7" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Room</text><rect x="391" y="551" width="88" height="107" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="400" y="558" width="70" height="19" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="435" y="568" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Repro</text><rect x="400" y="581" width="71" height="68" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="435" y="609.0" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Attendance</text><text x="435" y="621.0" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">&amp; Advisors</text><rect x="685" y="548" width="90" height="140" fill="#eeeeee" stroke="#999" stroke-width="1" stroke-dasharray="4,3"/><rect x="527" y="570" width="103" height="119" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="578" y="592.0" font-size="14" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Raider</text><text x="578" y="610.0" font-size="14" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Hall</text><text x="578" y="628.0" font-size="14" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">X1</text><rect x="527" y="553" width="121" height="17" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="527" y="497" width="56" height="56" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="555.0" y="525.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">X3</text><rect x="592" y="497" width="56" height="56" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="620.0" y="525.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">X2</text><rect x="240" y="732" width="155" height="112" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="249" y="753" width="47" height="32" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="272.5" y="769.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">I-1</text><rect x="301" y="753" width="86" height="39" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="344.0" y="772.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">I-2</text><rect x="249" y="798" width="48" height="37" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="273.0" y="816.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">I-3</text><rect x="302" y="798" width="85" height="37" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="344.5" y="816.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">I-4</text><rect x="469" y="729" width="123" height="231" fill="#ffffff" stroke="#111" stroke-width="2"/><rect x="504" y="737" width="41" height="41" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="524.5" y="757.5" font-size="12" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H2</text><rect x="477" y="803" width="35" height="33" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="494.5" y="819.5" font-size="9" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H10</text><rect x="477" y="841" width="34" height="34" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="494.0" y="858.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H9</text><rect x="477" y="879" width="34" height="35" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="494.0" y="896.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H8</text><rect x="477" y="919" width="34" height="33" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="494.0" y="935.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H7</text><rect x="549" y="803" width="35" height="33" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="566.5" y="819.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H3</text><rect x="549" y="841" width="35" height="34" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="566.5" y="858.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H4</text><rect x="549" y="879" width="35" height="35" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="566.5" y="896.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H5</text><rect x="549" y="919" width="35" height="33" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="566.5" y="935.5" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">H6</text><g transform="rotate(40 845 862)"><rect x="700" y="812" width="290" height="100" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="845" y="843.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Administration</text><text x="845" y="856.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">&amp; Counseling</text><text x="920" y="882" font-size="15" font-weight="700" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">S</text></g><rect x="770" y="745" width="80" height="60" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="810" y="758.0" font-size="8" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Mental Health</text><text x="810" y="768.0" font-size="8" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">&amp; Wellness</text><text x="810" y="778.0" font-size="8" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Center</text><g transform="rotate(45 940 770)"><rect x="905" y="735" width="70" height="70" fill="#ffffff" stroke="#111" stroke-width="2"/></g><g transform="rotate(45 945 815)"><rect x="920" y="798" width="50" height="35" fill="#ffffff" stroke="#111" stroke-width="2"/></g><text x="955" y="785" font-size="9" font-weight="700" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">Kitchen</text><text x="978" y="800" font-size="12" font-weight="700" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">R</text><rect x="116" y="866" width="37" height="53" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="134.5" y="892.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">J3</text><rect x="158" y="866" width="36" height="53" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="176.0" y="892.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">J2</text><rect x="198" y="866" width="34" height="53" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="215.0" y="892.5" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">J1</text><rect x="255" y="860" width="200" height="50" fill="#e9e9e9" stroke="#111" stroke-width="2"/><g transform="rotate(-12 300 1010)"><rect x="230" y="978" width="105" height="35" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="282" y="995" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U11</text><rect x="232" y="1013" width="60" height="70" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="262" y="1048" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U21</text><rect x="292" y="1013" width="63" height="70" fill="#ffffff" stroke="#111" stroke-width="2"/><text x="323" y="1048" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U20</text></g><rect x="343" y="1009" width="53" height="30" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="369.5" y="1024.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U6</text><rect x="415" y="1009" width="53" height="30" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="441.5" y="1024.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U4</text><rect x="474" y="1009" width="54" height="30" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="501.0" y="1024.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U3</text><rect x="547" y="1009" width="54" height="30" fill="#d9d9d9" stroke="#111" stroke-width="1.4"/><text x="574.0" y="1024.0" font-size="11" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U1</text><rect x="339" y="1046" width="45" height="52" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="361.5" y="1072.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U17</text><rect x="388" y="1046" width="39" height="52" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="407.5" y="1072.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U16</text><rect x="432" y="1046" width="39" height="52" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="451.5" y="1072.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U15</text><rect x="475" y="1046" width="39" height="52" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="494.5" y="1072.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U14</text><rect x="519" y="1046" width="39" height="52" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="538.5" y="1072.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U13</text><rect x="562" y="1046" width="39" height="52" fill="#ffffff" stroke="#111" stroke-width="1.4"/><text x="581.5" y="1072.0" font-size="10" font-weight="600" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">U12</text><text x="190" y="1000" font-size="9" font-weight="400" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">1st Floor</text><text x="190" y="1030" font-size="9" font-weight="400" fill="#111" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Helvetica,sans-serif">2nd Floor</text></g>
+          <g id="extras" pointer-events="none"></g>
+          <g id="hits"></g>
+          <g id="routeLayer" pointer-events="none"></g>
+        </svg>
+        <div class="zoom">
+          <button type="button" id="zin" aria-label="Zoom in">+</button>
+          <button type="button" id="zout" aria-label="Zoom out">−</button>
+          <button type="button" id="zall" class="txt" aria-label="Show whole campus">All</button>
+          <button type="button" id="zroute" class="txt" aria-label="Zoom to route">Route</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="dot s"></span> Start</span>
+        <span><span class="dot e"></span> Destination</span>
+        <span><i></i> Walking route (arrows show direction)</span>
+        <span><b class="lg door"></b> Door</span>
+        <span><b class="lg stair"></b> Stairs</span>
+        <span><b class="lg ent"></b> Building entrance</span>
+      </div>
+    </section>
+
+    <section class="card stepscard" aria-label="Directions">
+      <h2>Directions</h2>
+      <p class="summary" id="summary" aria-live="polite"></p>
+      <ol id="steps"></ol>
+      <p class="empty" id="empty">Pick a starting point and a destination to see the route and step-by-step directions.</p>
+      <p class="note">Routes are approximate and shown on the campus map. Please follow campus signs and ask a staff member if you need help.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var DATA = {"rooms":[{"id":"M2","label":"M2","mg":"M Building","lm":"M Building","poly":[[239,42],[285,42],[285,125],[239,125]],"floor":null,"bld":null,"cx":262.0,"cy":83.5,"stairs":null,"auto":true,"door":[262.0,42],"dout":[0.0,-1],"dcarve":14},{"id":"M1","label":"M1","mg":"M Building","lm":"M Building","poly":[[239,130],[285,130],[285,203],[239,203]],"floor":null,"bld":null,"cx":262.0,"cy":166.5,"stairs":null,"auto":true,"door":[262.0,203],"dout":[0.0,1],"dcarve":14},{"id":"RECCENTER","label":"Rec Center (M Building)","mg":"M Building","lm":"M Building","poly":[[160,169],[233,169],[233,204],[160,204]],"floor":null,"bld":null,"cx":196.5,"cy":186.5,"stairs":null,"auto":true,"door":[196.5,169],"dout":[0.0,-1],"dcarve":14},{"id":"D1","label":"D1","mg":"D Building","lm":"D Building","poly":[[396,104],[423,104],[423,143],[396,143]],"floor":null,"bld":null,"cx":409.5,"cy":123.5,"stairs":null,"auto":false,"door":[409.5,104],"dout":[0.0,-1],"dcarve":14},{"id":"D2","label":"D2","mg":"D Building","lm":"D Building","poly":[[428,104],[461,104],[461,143],[428,143]],"floor":null,"bld":null,"cx":444.5,"cy":123.5,"stairs":null,"auto":false,"door":[444.5,104],"dout":[0.0,-1],"dcarve":14},{"id":"D3","label":"D3","mg":"D Building","lm":"D Building","poly":[[467,104],[502,104],[502,143],[467,143]],"floor":null,"bld":null,"cx":484.5,"cy":123.5,"stairs":null,"auto":false,"door":[484.5,104],"dout":[0.0,-1],"dcarve":14},{"id":"D4","label":"D4","mg":"D Building","lm":"D Building","poly":[[507,104],[540,104],[540,143],[507,143]],"floor":null,"bld":null,"cx":523.5,"cy":123.5,"stairs":null,"auto":false,"door":[523.5,104],"dout":[0.0,-1],"dcarve":14},{"id":"D5","label":"D5","mg":"D Building","lm":"D Building","poly":[[545,104],[584,104],[584,143],[545,143]],"floor":null,"bld":null,"cx":564.5,"cy":123.5,"stairs":null,"auto":false,"door":[564.5,104],"dout":[0.0,-1],"dcarve":14},{"id":"D6","label":"D6","mg":"D Building","lm":"D Building","poly":[[589,104],[622,104],[622,143],[589,143]],"floor":null,"bld":null,"cx":605.5,"cy":123.5,"stairs":null,"auto":false,"door":[605.5,104],"dout":[0.0,-1],"dcarve":14},{"id":"D7","label":"D7","mg":"D Building","lm":"D Building","poly":[[626,104],[661,104],[661,143],[626,143]],"floor":null,"bld":null,"cx":643.5,"cy":123.5,"stairs":null,"auto":false,"door":[661,123.5],"dout":[1,0.0],"dcarve":14},{"id":"D13","label":"D13","mg":"D Building","lm":"D Building","poly":[[428,149],[462,149],[462,190],[428,190]],"floor":null,"bld":null,"cx":445.0,"cy":169.5,"stairs":null,"auto":false,"door":[445.0,190],"dout":[0.0,1],"dcarve":14},{"id":"D12","label":"D12","mg":"D Building","lm":"D Building","poly":[[467,149],[502,149],[502,190],[467,190]],"floor":null,"bld":null,"cx":484.5,"cy":169.5,"stairs":null,"auto":false,"door":[484.5,190],"dout":[0.0,1],"dcarve":14},{"id":"D11","label":"D11","mg":"D Building","lm":"D Building","poly":[[507,149],[540,149],[540,190],[507,190]],"floor":null,"bld":null,"cx":523.5,"cy":169.5,"stairs":null,"auto":false,"door":[523.5,190],"dout":[0.0,1],"dcarve":14},{"id":"D10","label":"D10","mg":"D Building","lm":"D Building","poly":[[545,149],[584,149],[584,190],[545,190]],"floor":null,"bld":null,"cx":564.5,"cy":169.5,"stairs":null,"auto":false,"door":[564.5,190],"dout":[0.0,1],"dcarve":14},{"id":"D9","label":"D9","mg":"D Building","lm":"D Building","poly":[[589,149],[622,149],[622,190],[589,190]],"floor":null,"bld":null,"cx":605.5,"cy":169.5,"stairs":null,"auto":false,"door":[605.5,190],"dout":[0.0,1],"dcarve":14},{"id":"D8","label":"D8","mg":"D Building","lm":"D Building","poly":[[626,149],[661,149],[661,190],[626,190]],"floor":null,"bld":null,"cx":643.5,"cy":169.5,"stairs":null,"auto":false,"door":[661,169.5],"dout":[1,0.0],"dcarve":14},{"id":"C1","label":"C1","mg":"C Building","lm":"C Building","poly":[[337,248],[382,248],[382,290],[337,290]],"floor":null,"bld":null,"cx":359.5,"cy":269.0,"stairs":null,"auto":false,"door":[359.5,248],"dout":[0.0,-1],"dcarve":14},{"id":"C2","label":"C2","mg":"C Building","lm":"C Building","poly":[[387,248],[441,248],[441,290],[387,290]],"floor":null,"bld":null,"cx":414.0,"cy":269.0,"stairs":null,"auto":false,"door":[414.0,248],"dout":[0.0,-1],"dcarve":14},{"id":"C3","label":"C3","mg":"C Building","lm":"C Building","poly":[[445,248],[491,248],[491,279],[445,279]],"floor":null,"bld":null,"cx":468.0,"cy":263.5,"stairs":null,"auto":false,"door":[468.0,248],"dout":[0.0,-1],"dcarve":14},{"id":"C8","label":"C8","mg":"C Building","lm":"C Building","poly":[[337,294],[382,294],[382,332],[337,332]],"floor":null,"bld":null,"cx":359.5,"cy":313.0,"stairs":null,"auto":false,"door":[359.5,332],"dout":[0.0,1],"dcarve":14},{"id":"C7","label":"C7","mg":"C Building","lm":"C Building","poly":[[387,294],[427,294],[427,332],[387,332]],"floor":null,"bld":null,"cx":407.0,"cy":313.0,"stairs":null,"auto":false,"door":[407.0,332],"dout":[0.0,1],"dcarve":14},{"id":"C5","label":"C5","mg":"C Building","lm":"C Building","poly":[[452,304],[491,304],[491,332],[452,332]],"floor":null,"bld":null,"cx":471.5,"cy":318.0,"stairs":null,"auto":false,"door":[471.5,332],"dout":[0.0,1],"dcarve":14},{"id":"E13","label":"E13","mg":"E Building","lm":"E Building","poly":[[571,241],[605,241],[605,270],[571,270]],"floor":null,"bld":null,"cx":588.0,"cy":255.5,"stairs":null,"auto":false,"door":[588.0,241],"dout":[0.0,-1],"dcarve":14},{"id":"E14","label":"E14","mg":"E Building","lm":"E Building","poly":[[611,241],[644,241],[644,270],[611,270]],"floor":null,"bld":null,"cx":627.5,"cy":255.5,"stairs":null,"auto":false,"door":[627.5,241],"dout":[0.0,-1],"dcarve":14},{"id":"E1","label":"E1","mg":"E Building","lm":"E Building","poly":[[648,266],[710,266],[710,306],[648,306]],"floor":null,"bld":null,"cx":679.0,"cy":286.0,"stairs":null,"auto":false,"door":[666.6,266],"dout":[0.0,-1],"dcarve":14},{"id":"E12","label":"E12","mg":"E Building","lm":"E Building","poly":[[571,275],[605,275],[605,306],[571,306]],"floor":null,"bld":null,"cx":588.0,"cy":290.5,"stairs":null,"auto":false,"door":[588.0,306],"dout":[0.0,1],"dcarve":14},{"id":"E11","label":"E11","mg":"E Building","lm":"E Building","poly":[[611,275],[644,275],[644,306],[611,306]],"floor":null,"bld":null,"cx":627.5,"cy":290.5,"stairs":null,"auto":false,"door":[617.6,306],"dout":[0.0,1],"dcarve":30},{"id":"E2","label":"E2","mg":"E Building","lm":"E Building","poly":[[670,296],[710,296],[710,331],[670,331]],"floor":null,"bld":null,"cx":690.0,"cy":313.5,"stairs":null,"auto":false,"door":[710,313.5],"dout":[1,0.0],"dcarve":14},{"id":"E10","label":"E10","mg":"E Building","lm":"E Building","poly":[[623,310],[666,310],[666,373],[623,373]],"floor":null,"bld":null,"cx":644.5,"cy":341.5,"stairs":null,"auto":false,"door":[623,341.5],"dout":[-1,0.0],"dcarve":14},{"id":"E3","label":"E3","mg":"E Building","lm":"E Building","poly":[[670,336],[711,336],[711,374],[670,374]],"floor":null,"bld":null,"cx":690.5,"cy":355.0,"stairs":null,"auto":false,"door":[711,355.0],"dout":[1,0.0],"dcarve":14},{"id":"E8","label":"E8","mg":"E Building","lm":"E Building","poly":[[573,374],[605,374],[605,403],[573,403]],"floor":null,"bld":null,"cx":589.0,"cy":388.5,"stairs":null,"auto":false,"door":[589.0,374],"dout":[0.0,-1],"dcarve":14},{"id":"E9","label":"E9","mg":"E Building","lm":"E Building","poly":[[609,374],[644,374],[644,403],[609,403]],"floor":null,"bld":null,"cx":626.5,"cy":388.5,"stairs":null,"auto":false,"door":[617.8,374],"dout":[0.0,-1],"dcarve":30},{"id":"E4","label":"E4","mg":"E Building","lm":"E Building","poly":[[670,379],[710,379],[710,419],[670,419]],"floor":null,"bld":null,"cx":690.0,"cy":399.0,"stairs":null,"auto":false,"door":[710,399.0],"dout":[1,0.0],"dcarve":14},{"id":"E7","label":"E7","mg":"E Building","lm":"E Building","poly":[[573,408],[605,408],[605,435],[573,435]],"floor":null,"bld":null,"cx":589.0,"cy":421.5,"stairs":null,"auto":false,"door":[589.0,435],"dout":[0.0,1],"dcarve":14},{"id":"E6","label":"E6","mg":"E Building","lm":"E Building","poly":[[609,408],[644,408],[644,435],[609,435]],"floor":null,"bld":null,"cx":626.5,"cy":421.5,"stairs":null,"auto":false,"door":[626.5,435],"dout":[0.0,1],"dcarve":14},{"id":"T7","label":"T7","mg":"T Building","lm":"T Building","poly":[[771,229],[810,229],[810,267],[771,267]],"floor":null,"bld":null,"cx":790.5,"cy":248.0,"stairs":null,"auto":false,"door":[771,248.0],"dout":[-1,0.0],"dcarve":14},{"id":"T8","label":"T8","mg":"T Building","lm":"T Building","poly":[[814,229],[854,229],[854,267],[814,267]],"floor":null,"bld":null,"cx":834.0,"cy":248.0,"stairs":null,"auto":false,"door":[854,248.0],"dout":[1,0.0],"dcarve":14},{"id":"T5","label":"T5","mg":"T Building","lm":"T Building","poly":[[771,272],[810,272],[810,315],[771,315]],"floor":null,"bld":null,"cx":790.5,"cy":293.5,"stairs":null,"auto":false,"door":[771,293.5],"dout":[-1,0.0],"dcarve":14},{"id":"T6","label":"T6","mg":"T Building","lm":"T Building","poly":[[814,272],[854,272],[854,315],[814,315]],"floor":null,"bld":null,"cx":834.0,"cy":293.5,"stairs":null,"auto":false,"door":[854,293.5],"dout":[1,0.0],"dcarve":14},{"id":"T3","label":"T3","mg":"T Building","lm":"T Building","poly":[[771,320],[810,320],[810,359],[771,359]],"floor":null,"bld":null,"cx":790.5,"cy":339.5,"stairs":null,"auto":false,"door":[771,339.5],"dout":[-1,0.0],"dcarve":14},{"id":"T4","label":"T4","mg":"T Building","lm":"T Building","poly":[[815,320],[854,320],[854,359],[815,359]],"floor":null,"bld":null,"cx":834.5,"cy":339.5,"stairs":null,"auto":false,"door":[854,339.5],"dout":[1,0.0],"dcarve":14},{"id":"T1","label":"T1","mg":"T Building","lm":"T Building","poly":[[771,364],[810,364],[810,395],[771,395]],"floor":null,"bld":null,"cx":790.5,"cy":379.5,"stairs":null,"auto":false,"door":[771,379.5],"dout":[-1,0.0],"dcarve":14},{"id":"T2","label":"T2","mg":"T Building","lm":"T Building","poly":[[814,364],[854,364],[854,395],[814,395]],"floor":null,"bld":null,"cx":834.0,"cy":379.5,"stairs":null,"auto":false,"door":[854,379.5],"dout":[1,0.0],"dcarve":14},{"id":"B1","label":"B1","mg":"B Building","lm":"B Building","poly":[[226,383],[264,383],[264,422],[226,422]],"floor":null,"bld":null,"cx":245.0,"cy":402.5,"stairs":null,"auto":false,"door":[245.0,383],"dout":[0.0,-1],"dcarve":14},{"id":"B2","label":"B2","mg":"B Building","lm":"B Building","poly":[[269,383],[311,383],[311,422],[269,422]],"floor":null,"bld":null,"cx":290.0,"cy":402.5,"stairs":null,"auto":false,"door":[290.0,383],"dout":[0.0,-1],"dcarve":14},{"id":"B3","label":"B3","mg":"B Building","lm":"B Building","poly":[[316,383],[362,383],[362,412],[316,412]],"floor":null,"bld":null,"cx":339.0,"cy":397.5,"stairs":null,"auto":false,"door":[339.0,383],"dout":[0.0,-1],"dcarve":14},{"id":"B7","label":"B7","mg":"B Building","lm":"B Building","poly":[[226,427],[264,427],[264,467],[226,467]],"floor":null,"bld":null,"cx":245.0,"cy":447.0,"stairs":null,"auto":false,"door":[245.0,467],"dout":[0.0,1],"dcarve":14},{"id":"B6","label":"B6","mg":"B Building","lm":"B Building","poly":[[269,427],[311,427],[311,467],[269,467]],"floor":null,"bld":null,"cx":290.0,"cy":447.0,"stairs":null,"auto":false,"door":[290.0,467],"dout":[0.0,1],"dcarve":14},{"id":"B5","label":"B5","mg":"B Building","lm":"B Building","poly":[[316,438],[362,438],[362,467],[316,467]],"floor":null,"bld":null,"cx":339.0,"cy":452.5,"stairs":null,"auto":false,"door":[339.0,467],"dout":[0.0,1],"dcarve":14},{"id":"L7","label":"L7","mg":"L Building","lm":"L Building","poly":[[58,266],[116,266],[116,298],[58,298]],"floor":null,"bld":null,"cx":87.0,"cy":282.0,"stairs":null,"auto":false,"door":[58,282.0],"dout":[-1,0.0],"dcarve":14},{"id":"L6","label":"L6","mg":"L Building","lm":"L Building","poly":[[58,298],[116,298],[116,330],[58,330]],"floor":null,"bld":null,"cx":87.0,"cy":314.0,"stairs":null,"auto":false,"door":[58,314.0],"dout":[-1,0.0],"dcarve":14},{"id":"L5","label":"L5","mg":"L Building","lm":"L Building","poly":[[58,330],[116,330],[116,362],[58,362]],"floor":null,"bld":null,"cx":87.0,"cy":346.0,"stairs":null,"auto":false,"door":[58,346.0],"dout":[-1,0.0],"dcarve":14},{"id":"L4","label":"L4","mg":"L Building","lm":"L Building","poly":[[58,362],[116,362],[116,394],[58,394]],"floor":null,"bld":null,"cx":87.0,"cy":378.0,"stairs":null,"auto":false,"door":[58,378.0],"dout":[-1,0.0],"dcarve":14},{"id":"L3","label":"L3","mg":"L Building","lm":"L Building","poly":[[58,394],[116,394],[116,426],[58,426]],"floor":null,"bld":null,"cx":87.0,"cy":410.0,"stairs":null,"auto":false,"door":[58,410.0],"dout":[-1,0.0],"dcarve":14},{"id":"L2","label":"L2","mg":"L Building","lm":"L Building","poly":[[58,426],[116,426],[116,458],[58,458]],"floor":null,"bld":null,"cx":87.0,"cy":442.0,"stairs":null,"auto":false,"door":[58,442.0],"dout":[-1,0.0],"dcarve":14},{"id":"L1","label":"L1","mg":"L Building","lm":"L Building","poly":[[58,458],[116,458],[116,490],[58,490]],"floor":null,"bld":null,"cx":87.0,"cy":474.0,"stairs":null,"auto":false,"door":[58,474.0],"dout":[-1,0.0],"dcarve":14},{"id":"L9","label":"L9","mg":"L Building","lm":"L Building","poly":[[116,235],[158,235],[158,267],[116,267]],"floor":null,"bld":null,"cx":137.0,"cy":251.0,"stairs":null,"auto":true,"door":[137.0,235],"dout":[0.0,-1],"dcarve":14},{"id":"L10","label":"L10","mg":"L Building","lm":"L Building","poly":[[116,266],[174,266],[174,298],[116,298]],"floor":null,"bld":null,"cx":145.0,"cy":282.0,"stairs":null,"auto":false,"door":[174,282.0],"dout":[1,0.0],"dcarve":14},{"id":"L11","label":"L11","mg":"L Building","lm":"L Building","poly":[[116,298],[174,298],[174,330],[116,330]],"floor":null,"bld":null,"cx":145.0,"cy":314.0,"stairs":null,"auto":false,"door":[174,314.0],"dout":[1,0.0],"dcarve":14},{"id":"L12","label":"L12","mg":"L Building","lm":"L Building","poly":[[116,330],[174,330],[174,362],[116,362]],"floor":null,"bld":null,"cx":145.0,"cy":346.0,"stairs":null,"auto":false,"door":[174,346.0],"dout":[1,0.0],"dcarve":14},{"id":"L13","label":"L13","mg":"L Building","lm":"L Building","poly":[[116,362],[174,362],[174,394],[116,394]],"floor":null,"bld":null,"cx":145.0,"cy":378.0,"stairs":null,"auto":false,"door":[174,378.0],"dout":[1,0.0],"dcarve":14},{"id":"L14","label":"L14","mg":"L Building","lm":"L Building","poly":[[116,394],[174,394],[174,426],[116,426]],"floor":null,"bld":null,"cx":145.0,"cy":410.0,"stairs":null,"auto":false,"door":[174,410.0],"dout":[1,0.0],"dcarve":14},{"id":"L15","label":"L15","mg":"L Building","lm":"L Building","poly":[[116,426],[174,426],[174,458],[116,458]],"floor":null,"bld":null,"cx":145.0,"cy":442.0,"stairs":null,"auto":false,"door":[174,442.0],"dout":[1,0.0],"dcarve":14},{"id":"K104","label":"K104","mg":"K Building","lm":"K Building","poly":[[77,562],[126,562],[126,591],[77,591]],"floor":1,"bld":"K","cx":101.5,"cy":576.5,"stairs":["KS1","KS2"],"auto":false,"door":[126,576.5],"dout":[1,0.0],"dcarve":24},{"id":"K105","label":"K105","mg":"K Building","lm":"K Building","poly":[[153,555],[199,555],[199,589],[153,589]],"floor":1,"bld":"K","cx":176.0,"cy":572.0,"stairs":["KS1","KS2"],"auto":false,"door":[153,572.0],"dout":[-1,0.0],"dcarve":24},{"id":"K204","label":"K204","mg":"K Building","lm":"K Building","poly":[[76,595],[127,595],[127,626],[76,626]],"floor":2,"bld":"K","cx":101.5,"cy":610.5,"stairs":["KS1","KS2"],"auto":false,"door":[127,610.5],"dout":[1,0.0],"dcarve":24},{"id":"K205","label":"K205","mg":"K Building","lm":"K Building","poly":[[152,595],[200,595],[200,626],[152,626]],"floor":2,"bld":"K","cx":176.0,"cy":610.5,"stairs":["KS1","KS2"],"auto":false,"door":[152,610.5],"dout":[-1,0.0],"dcarve":24},{"id":"K103","label":"K103","mg":"K Building","lm":"K Building","poly":[[77,632],[126,632],[126,666],[77,666]],"floor":1,"bld":"K","cx":101.5,"cy":649.0,"stairs":["KS1","KS2"],"auto":false,"door":[126,649.0],"dout":[1,0.0],"dcarve":24},{"id":"K203","label":"K203","mg":"K Building","lm":"K Building","poly":[[76,672],[127,672],[127,703],[76,703]],"floor":2,"bld":"K","cx":101.5,"cy":687.5,"stairs":["KS1","KS2"],"auto":false,"door":[127,687.5],"dout":[1,0.0],"dcarve":24},{"id":"K102","label":"K102","mg":"K Building","lm":"K Building","poly":[[94,711],[150,711],[150,748],[94,748]],"floor":1,"bld":"K","cx":122.0,"cy":729.5,"stairs":["KS1","KS2"],"auto":false,"door":[141.6,711],"dout":[0.0,-1],"dcarve":10},{"id":"K101","label":"K101","mg":"K Building","lm":"K Building","poly":[[156,709],[213,709],[213,748],[156,748]],"floor":1,"bld":"K","cx":184.5,"cy":728.5,"stairs":["KS1","KS2"],"auto":false,"door":[184.5,709],"dout":[0.0,-1],"dcarve":10},{"id":"K202","label":"K202","mg":"K Building","lm":"K Building","poly":[[93,755],[151,755],[151,792],[93,792]],"floor":2,"bld":"K","cx":122.0,"cy":773.5,"stairs":["KS1","KS2"],"auto":false,"door":[139.4,755],"dout":[0.0,-1],"dcarve":58},{"id":"K201","label":"K201","mg":"K Building","lm":"K Building","poly":[[155,754],[213,754],[213,792],[155,792]],"floor":2,"bld":"K","cx":184.0,"cy":773.0,"stairs":["KS1","KS2"],"auto":false,"door":[184.0,754],"dout":[0.0,-1],"dcarve":58},{"id":"X3","label":"X3","mg":"X Building","lm":"X Building","poly":[[527,497],[583,497],[583,553],[527,553]],"floor":null,"bld":null,"cx":555.0,"cy":525.0,"stairs":null,"auto":false,"door":[555.0,553],"dout":[0.0,1],"dcarve":12},{"id":"X2","label":"X2","mg":"X Building","lm":"X Building","poly":[[592,497],[648,497],[648,553],[592,553]],"floor":null,"bld":null,"cx":620.0,"cy":525.0,"stairs":null,"auto":false,"door":[620.0,553],"dout":[0.0,1],"dcarve":12},{"id":"I-1","label":"I-1","mg":"I Building","lm":"I Building","poly":[[249,753],[296,753],[296,785],[249,785]],"floor":null,"bld":null,"cx":272.5,"cy":769.0,"stairs":null,"auto":false,"door":[272.5,753],"dout":[0.0,-1],"dcarve":24},{"id":"I-2","label":"I-2","mg":"I Building","lm":"I Building","poly":[[301,753],[387,753],[387,792],[301,792]],"floor":null,"bld":null,"cx":344.0,"cy":772.5,"stairs":null,"auto":false,"door":[344.0,753],"dout":[0.0,-1],"dcarve":24},{"id":"I-3","label":"I-3","mg":"I Building","lm":"I Building","poly":[[249,798],[297,798],[297,835],[249,835]],"floor":null,"bld":null,"cx":273.0,"cy":816.5,"stairs":null,"auto":false,"door":[273.0,835],"dout":[0.0,1],"dcarve":24},{"id":"I-4","label":"I-4","mg":"I Building","lm":"I Building","poly":[[302,798],[387,798],[387,835],[302,835]],"floor":null,"bld":null,"cx":344.5,"cy":816.5,"stairs":null,"auto":false,"door":[344.5,835],"dout":[0.0,1],"dcarve":24},{"id":"H2","label":"H2","mg":"H Building","lm":"H Building","poly":[[504,737],[545,737],[545,778],[504,778]],"floor":null,"bld":null,"cx":524.5,"cy":757.5,"stairs":null,"auto":false,"door":[524.5,737],"dout":[0.0,-1],"dcarve":24},{"id":"H10","label":"H10","mg":"H Building","lm":"H Building","poly":[[477,803],[512,803],[512,836],[477,836]],"floor":null,"bld":null,"cx":494.5,"cy":819.5,"stairs":null,"auto":false,"door":[477,819.5],"dout":[-1,0.0],"dcarve":24},{"id":"H9","label":"H9","mg":"H Building","lm":"H Building","poly":[[477,841],[511,841],[511,875],[477,875]],"floor":null,"bld":null,"cx":494.0,"cy":858.0,"stairs":null,"auto":false,"door":[477,858.0],"dout":[-1,0.0],"dcarve":24},{"id":"H8","label":"H8","mg":"H Building","lm":"H Building","poly":[[477,879],[511,879],[511,914],[477,914]],"floor":null,"bld":null,"cx":494.0,"cy":896.5,"stairs":null,"auto":false,"door":[477,896.5],"dout":[-1,0.0],"dcarve":24},{"id":"H7","label":"H7","mg":"H Building","lm":"H Building","poly":[[477,919],[511,919],[511,952],[477,952]],"floor":null,"bld":null,"cx":494.0,"cy":935.5,"stairs":null,"auto":false,"door":[477,935.5],"dout":[-1,0.0],"dcarve":24},{"id":"H3","label":"H3","mg":"H Building","lm":"H Building","poly":[[549,803],[584,803],[584,836],[549,836]],"floor":null,"bld":null,"cx":566.5,"cy":819.5,"stairs":null,"auto":false,"door":[584,819.5],"dout":[1,0.0],"dcarve":24},{"id":"H4","label":"H4","mg":"H Building","lm":"H Building","poly":[[549,841],[584,841],[584,875],[549,875]],"floor":null,"bld":null,"cx":566.5,"cy":858.0,"stairs":null,"auto":false,"door":[584,858.0],"dout":[1,0.0],"dcarve":24},{"id":"H5","label":"H5","mg":"H Building","lm":"H Building","poly":[[549,879],[584,879],[584,914],[549,914]],"floor":null,"bld":null,"cx":566.5,"cy":896.5,"stairs":null,"auto":false,"door":[584,896.5],"dout":[1,0.0],"dcarve":24},{"id":"H6","label":"H6","mg":"H Building","lm":"H Building","poly":[[549,919],[584,919],[584,952],[549,952]],"floor":null,"bld":null,"cx":566.5,"cy":935.5,"stairs":null,"auto":false,"door":[584,935.5],"dout":[1,0.0],"dcarve":24},{"id":"J3","label":"J3","mg":"J Building","lm":"J Building","poly":[[116,866],[153,866],[153,919],[116,919]],"floor":null,"bld":null,"cx":134.5,"cy":892.5,"stairs":null,"auto":false,"door":[134.5,866],"dout":[0.0,-1],"dcarve":24},{"id":"J2","label":"J2","mg":"J Building","lm":"J Building","poly":[[158,866],[194,866],[194,919],[158,919]],"floor":null,"bld":null,"cx":176.0,"cy":892.5,"stairs":null,"auto":false,"door":[176.0,866],"dout":[0.0,-1],"dcarve":24},{"id":"J1","label":"J1","mg":"J Building","lm":"J Building","poly":[[198,866],[232,866],[232,919],[198,919]],"floor":null,"bld":null,"cx":215.0,"cy":892.5,"stairs":null,"auto":false,"door":[215.0,866],"dout":[0.0,-1],"dcarve":24},{"id":"U6","label":"U6","mg":"U Building","lm":"U Building","poly":[[343,1009],[396,1009],[396,1039],[343,1039]],"floor":1,"bld":"U","cx":369.5,"cy":1024.0,"stairs":["US1","US2"],"auto":false,"door":[369.5,1009],"dout":[0.0,-1],"dcarve":14},{"id":"U4","label":"U4","mg":"U Building","lm":"U Building","poly":[[415,1009],[468,1009],[468,1039],[415,1039]],"floor":1,"bld":"U","cx":441.5,"cy":1024.0,"stairs":["US1","US2"],"auto":false,"door":[441.5,1009],"dout":[0.0,-1],"dcarve":14},{"id":"U3","label":"U3","mg":"U Building","lm":"U Building","poly":[[474,1009],[528,1009],[528,1039],[474,1039]],"floor":1,"bld":"U","cx":501.0,"cy":1024.0,"stairs":["US1","US2"],"auto":false,"door":[501.0,1009],"dout":[0.0,-1],"dcarve":14},{"id":"U1","label":"U1","mg":"U Building","lm":"U Building","poly":[[547,1009],[601,1009],[601,1039],[547,1039]],"floor":1,"bld":"U","cx":574.0,"cy":1024.0,"stairs":["US1","US2"],"auto":false,"door":[574.0,1009],"dout":[0.0,-1],"dcarve":14},{"id":"U17","label":"U17","mg":"U Building","lm":"U Building","poly":[[339,1046],[384,1046],[384,1098],[339,1098]],"floor":2,"bld":"U","cx":361.5,"cy":1072.0,"stairs":["US2"],"auto":false,"door":[375.0,1046],"dout":[0.0,-1],"dcarve":10},{"id":"U16","label":"U16","mg":"U Building","lm":"U Building","poly":[[388,1046],[427,1046],[427,1098],[388,1098]],"floor":2,"bld":"U","cx":407.5,"cy":1072.0,"stairs":["US2"],"auto":false,"door":[407.5,1046],"dout":[0.0,-1],"dcarve":10},{"id":"U15","label":"U15","mg":"U Building","lm":"U Building","poly":[[432,1046],[471,1046],[471,1098],[432,1098]],"floor":2,"bld":"U","cx":451.5,"cy":1072.0,"stairs":["US2"],"auto":false,"door":[451.5,1046],"dout":[0.0,-1],"dcarve":10},{"id":"U14","label":"U14","mg":"U Building","lm":"U Building","poly":[[475,1046],[514,1046],[514,1098],[475,1098]],"floor":2,"bld":"U","cx":494.5,"cy":1072.0,"stairs":["US2"],"auto":false,"door":[494.5,1046],"dout":[0.0,-1],"dcarve":10},{"id":"U13","label":"U13","mg":"U Building","lm":"U Building","poly":[[519,1046],[558,1046],[558,1098],[519,1098]],"floor":2,"bld":"U","cx":538.5,"cy":1072.0,"stairs":["US2"],"auto":false,"door":[538.5,1046],"dout":[0.0,-1],"dcarve":10},{"id":"U12","label":"U12","mg":"U Building","lm":"U Building","poly":[[562,1046],[601,1046],[601,1098],[562,1098]],"floor":2,"bld":"U","cx":581.5,"cy":1072.0,"stairs":["US2"],"auto":false,"door":[581.5,1046],"dout":[0.0,-1],"dcarve":10},{"id":"LIB","label":"Library (A)","mg":"Library, Gyms & Services","lm":"Library","poly":[[263,549],[374,549],[374,658],[263,658]],"floor":null,"bld":null,"cx":318.5,"cy":603.5,"stairs":null,"auto":false,"door":[374,603.5],"dout":[1,0.0],"dcarve":24},{"id":"ATT","label":"Attendance & Advisors","mg":"Library, Gyms & Services","lm":"Attendance & Advisors","poly":[[400,581],[471,581],[471,649],[400,649]],"floor":null,"bld":null,"cx":435.5,"cy":615.0,"stairs":null,"auto":false,"door":[435.5,649],"dout":[0.0,1],"dcarve":16},{"id":"X1","label":"Raider Hall (X1)","mg":"X Building","lm":"Raider Hall","poly":[[527,570],[630,570],[630,689],[527,689]],"floor":null,"bld":null,"cx":578.5,"cy":629.5,"stairs":null,"auto":true,"door":[578.5,689],"dout":[0.0,1],"dcarve":14},{"id":"MAINGYM","label":"Main Gym","mg":"Library, Gyms & Services","lm":"Main Gym","poly":[[1048,488],[1230,488],[1230,705],[1048,705]],"floor":null,"bld":null,"cx":1139.0,"cy":596.5,"stairs":null,"auto":true,"door":[1139.0,488],"dout":[0.0,-1],"dcarve":10},{"id":"O","label":"Small Gym (O)","mg":"Library, Gyms & Services","lm":"Small Gym","poly":[[980,488],[1048,488],[1048,628],[980,628]],"floor":null,"bld":null,"cx":1014.0,"cy":558.0,"stairs":null,"auto":true,"door":[1014.0,488],"dout":[0.0,-1],"dcarve":10},{"id":"P","label":"Boys' Locker Room (P)","mg":"Library, Gyms & Services","lm":"Locker Rooms","poly":[[1232,285],[1315,285],[1315,493],[1232,493]],"floor":null,"bld":null,"cx":1273.5,"cy":389.0,"stairs":null,"auto":true,"door":[1273.5,285],"dout":[0.0,-1],"dcarve":10},{"id":"Q","label":"Girls' Locker Room (Q)","mg":"Library, Gyms & Services","lm":"Locker Rooms","poly":[[1232,652],[1315,652],[1315,846],[1232,846]],"floor":null,"bld":null,"cx":1273.5,"cy":749.0,"stairs":null,"auto":true,"door":[1273.5,652],"dout":[0.0,-1],"dcarve":10},{"id":"LAP","label":"Lap Pool","mg":"Library, Gyms & Services","lm":"Pools","poly":[[1305,505],[1400,505],[1400,555],[1305,555]],"floor":null,"bld":null,"cx":1352.5,"cy":530.0,"stairs":null,"auto":true,"door":[1352.5,505],"dout":[0.0,-1],"dcarve":10},{"id":"DIVE","label":"Diving Pool","mg":"Library, Gyms & Services","lm":"Pools","poly":[[1305,558],[1400,558],[1400,608],[1305,608]],"floor":null,"bld":null,"cx":1352.5,"cy":583.0,"stairs":null,"auto":false,"door":[1352.5,608],"dout":[0.0,1],"dcarve":14},{"id":"R","label":"Kitchen (R)","mg":"Library, Gyms & Services","lm":"Kitchen","poly":[[940.0,720.5],[989.5,770.0],[940.0,819.5],[890.5,770.0]],"floor":null,"bld":null,"cx":940.0,"cy":770.0,"stairs":null,"auto":true,"door":[964.7,745.3],"dout":[0.707,-0.707],"dcarve":10},{"id":"S","label":"Administration & Counseling (S)","mg":"Library, Gyms & Services","lm":"Administration Building","poly":[[766.1,730.5],[988.2,916.9],[923.9,993.5],[701.8,807.1]],"floor":null,"bld":null,"cx":845.0,"cy":862.0,"stairs":null,"auto":true,"door":[877.1,823.7],"dout":[0.643,-0.766],"dcarve":10},{"id":"MHW","label":"Mental Health & Wellness Center","mg":"Library, Gyms & Services","lm":"Mental Health & Wellness Center","poly":[[770,745],[850,745],[850,805],[770,805]],"floor":null,"bld":null,"cx":810.0,"cy":775.0,"stairs":null,"auto":true,"door":[810.0,745],"dout":[0.0,-1],"dcarve":10},{"id":"N3","label":"N3 (Weight Room)","mg":"N Building","lm":"N Building","poly":[[898,340],[933,340],[933,430],[898,430]],"floor":null,"bld":null,"cx":915.5,"cy":385.0,"stairs":null,"auto":true,"door":[915.5,340],"dout":[0.0,-1],"dcarve":14},{"id":"N4","label":"N4 (Fitness Center)","mg":"N Building","lm":"N Building","poly":[[939,340],[992,340],[992,390],[939,390]],"floor":null,"bld":null,"cx":965.5,"cy":365.0,"stairs":null,"auto":true,"door":[965.5,340],"dout":[0.0,-1],"dcarve":14},{"id":"U11","label":"U11","mg":"U Building","lm":"U Building","poly":[[224.9,993.3],[327.6,971.4],[334.9,1005.7],[232.2,1027.5]],"floor":1,"bld":"U","cx":279.9,"cy":999.5,"stairs":["US1"],"auto":false,"door":[276.2,982.3],"dout":[-0.208,-0.978],"dcarve":24},{"id":"U21","label":"U21","mg":"U Building","lm":"U Building","poly":[[234.1,1027.1],[292.8,1014.6],[307.4,1083.1],[248.7,1095.5]],"floor":2,"bld":"U","cx":270.8,"cy":1055.1,"stairs":["US1"],"auto":false,"door":[263.5,1020.8],"dout":[-0.208,-0.978],"dcarve":14},{"id":"U20","label":"U20","mg":"U Building","lm":"U Building","poly":[[292.8,1014.6],[354.4,1001.5],[369.0,1070.0],[307.4,1083.1]],"floor":2,"bld":"U","cx":330.9,"cy":1042.3,"stairs":["US1"],"auto":false,"door":[345.2,1003.5],"dout":[-0.208,-0.978],"dcarve":14}],"menu":[{"group":"Library, Gyms & Services","ids":["S","ATT","P","DIVE","Q","R","LAP","LIB","MAINGYM","MHW","O"]},{"group":"B Building","ids":["B1","B2","B3","B5","B6","B7"]},{"group":"C Building","ids":["C1","C2","C3","C5","C7","C8"]},{"group":"D Building","ids":["D1","D2","D3","D4","D5","D6","D7","D8","D9","D10","D11","D12","D13"]},{"group":"E Building","ids":["E1","E2","E3","E4","E6","E7","E8","E9","E10","E11","E12","E13","E14"]},{"group":"H Building","ids":["H2","H3","H4","H5","H6","H7","H8","H9","H10"]},{"group":"I Building","ids":["I-1","I-2","I-3","I-4"]},{"group":"J Building","ids":["J1","J2","J3"]},{"group":"K Building","ids":["K101","K102","K103","K104","K105","K201","K202","K203","K204","K205"]},{"group":"L Building","ids":["L1","L2","L3","L4","L5","L6","L7","L9","L10","L11","L12","L13","L14","L15"]},{"group":"M Building","ids":["M1","M2","RECCENTER"]},{"group":"N Building","ids":["N3","N4"]},{"group":"T Building","ids":["T1","T2","T3","T4","T5","T6","T7","T8"]},{"group":"U Building","ids":["U1","U3","U4","U6","U11","U12","U13","U14","U15","U16","U17","U20","U21"]},{"group":"X Building","ids":["X1","X2","X3"]}],"obst":[[[159,41],[234,41],[234,103],[159,103]],[[239,42],[285,42],[285,125],[239,125]],[[239,130],[285,130],[285,203],[239,203]],[[160,169],[233,169],[233,204],[160,204]],[[396,104],[423,104],[423,143],[396,143]],[[428,104],[461,104],[461,143],[428,143]],[[467,104],[502,104],[502,143],[467,143]],[[507,104],[540,104],[540,143],[507,143]],[[545,104],[584,104],[584,143],[545,143]],[[589,104],[622,104],[622,143],[589,143]],[[626,104],[661,104],[661,143],[626,143]],[[396,149],[423,149],[423,190],[396,190]],[[428,149],[462,149],[462,190],[428,190]],[[467,149],[502,149],[502,190],[467,190]],[[507,149],[540,149],[540,190],[507,190]],[[545,149],[584,149],[584,190],[545,190]],[[589,149],[622,149],[622,190],[589,190]],[[626,149],[661,149],[661,190],[626,190]],[[337,248],[382,248],[382,290],[337,290]],[[387,248],[441,248],[441,290],[387,290]],[[445,248],[491,248],[491,279],[445,279]],[[337,294],[382,294],[382,332],[337,332]],[[387,294],[427,294],[427,332],[387,332]],[[432,295],[446,295],[446,332],[432,332]],[[452,304],[491,304],[491,332],[452,332]],[[571,241],[605,241],[605,270],[571,270]],[[611,241],[644,241],[644,270],[611,270]],[[648,266],[710,266],[710,306],[648,306]],[[571,275],[605,275],[605,306],[571,306]],[[611,275],[644,275],[644,306],[611,306]],[[670,296],[710,296],[710,331],[670,331]],[[623,310],[666,310],[666,373],[623,373]],[[670,336],[711,336],[711,374],[670,374]],[[573,374],[605,374],[605,403],[573,403]],[[609,374],[644,374],[644,403],[609,403]],[[670,379],[710,379],[710,419],[670,419]],[[573,408],[605,408],[605,435],[573,435]],[[609,408],[644,408],[644,435],[609,435]],[[771,229],[810,229],[810,267],[771,267]],[[814,229],[854,229],[854,267],[814,267]],[[771,272],[810,272],[810,315],[771,315]],[[814,272],[854,272],[854,315],[814,315]],[[771,320],[810,320],[810,359],[771,359]],[[815,320],[854,320],[854,359],[815,359]],[[771,364],[810,364],[810,395],[771,395]],[[814,364],[854,364],[854,395],[814,395]],[[226,383],[264,383],[264,422],[226,422]],[[269,383],[311,383],[311,422],[269,422]],[[316,383],[362,383],[362,412],[316,412]],[[226,427],[264,427],[264,467],[226,467]],[[269,427],[311,427],[311,467],[269,467]],[[316,417],[362,417],[362,433],[316,433]],[[316,438],[362,438],[362,467],[316,467]],[[898,340],[939,340],[939,400],[898,400]],[[898,400],[923,400],[923,430],[898,430]],[[933,340],[992,340],[992,390],[933,390]],[[933,390],[968,390],[968,415],[933,415]],[[957,415],[977,415],[977,430],[957,430]],[[1232,285],[1315,285],[1315,493],[1232,493]],[[1232,652],[1315,652],[1315,846],[1232,846]],[[980,488],[1048,488],[1048,628],[980,628]],[[1048,488],[1230,488],[1230,705],[1048,705]],[[1305,505],[1400,505],[1400,555],[1305,555]],[[1305,558],[1400,558],[1400,608],[1305,608]],[[58,266],[116,266],[116,298],[58,298]],[[58,298],[116,298],[116,330],[58,330]],[[58,330],[116,330],[116,362],[58,362]],[[58,362],[116,362],[116,394],[58,394]],[[58,394],[116,394],[116,426],[58,426]],[[58,426],[116,426],[116,458],[58,458]],[[58,458],[116,458],[116,490],[58,490]],[[116,235],[158,235],[158,267],[116,267]],[[116,266],[174,266],[174,298],[116,298]],[[116,298],[174,298],[174,330],[116,330]],[[116,330],[174,330],[174,362],[116,362]],[[116,362],[174,362],[174,394],[116,394]],[[116,394],[174,394],[174,426],[116,426]],[[116,426],[174,426],[174,458],[116,458]],[[77,562],[126,562],[126,591],[77,591]],[[153,555],[199,555],[199,589],[153,589]],[[76,595],[127,595],[127,626],[76,626]],[[152,595],[200,595],[200,626],[152,626]],[[77,632],[126,632],[126,666],[77,666]],[[76,672],[127,672],[127,703],[76,703]],[[94,711],[150,711],[150,748],[94,748]],[[156,709],[213,709],[213,748],[156,748]],[[93,755],[151,755],[151,792],[93,792]],[[155,754],[213,754],[213,792],[155,792]],[[263,549],[374,549],[374,658],[263,658]],[[326,618],[366,618],[366,640],[326,640]],[[391,551],[479,551],[479,658],[391,658]],[[400,558],[470,558],[470,577],[400,577]],[[400,581],[471,581],[471,649],[400,649]],[[527,570],[630,570],[630,689],[527,689]],[[527,497],[583,497],[583,553],[527,553]],[[592,497],[648,497],[648,553],[592,553]],[[240,732],[395,732],[395,844],[240,844]],[[249,753],[296,753],[296,785],[249,785]],[[301,753],[387,753],[387,792],[301,792]],[[249,798],[297,798],[297,835],[249,835]],[[302,798],[387,798],[387,835],[302,835]],[[469,729],[592,729],[592,960],[469,960]],[[504,737],[545,737],[545,778],[504,778]],[[477,803],[512,803],[512,836],[477,836]],[[477,841],[511,841],[511,875],[477,875]],[[477,879],[511,879],[511,914],[477,914]],[[477,919],[511,919],[511,952],[477,952]],[[549,803],[584,803],[584,836],[549,836]],[[549,841],[584,841],[584,875],[549,875]],[[549,879],[584,879],[584,914],[549,914]],[[549,919],[584,919],[584,952],[549,952]],[[766.1,730.5],[988.2,916.9],[923.9,993.5],[701.8,807.1]],[[770,745],[850,745],[850,805],[770,805]],[[940.0,720.5],[989.5,770.0],[940.0,819.5],[890.5,770.0]],[[939.3,785.3],[974.7,820.7],[949.9,845.4],[914.6,810.1]],[[116,866],[153,866],[153,919],[116,919]],[[158,866],[194,866],[194,919],[158,919]],[[198,866],[232,866],[232,919],[198,919]],[[224.9,993.3],[327.6,971.4],[334.9,1005.7],[232.2,1027.5]],[[234.1,1027.1],[292.8,1014.6],[307.4,1083.1],[248.7,1095.5]],[[292.8,1014.6],[354.4,1001.5],[369.0,1070.0],[307.4,1083.1]],[[343,1009],[396,1009],[396,1039],[343,1039]],[[415,1009],[468,1009],[468,1039],[415,1039]],[[474,1009],[528,1009],[528,1039],[474,1039]],[[547,1009],[601,1009],[601,1039],[547,1039]],[[339,1046],[384,1046],[384,1098],[339,1098]],[[388,1046],[427,1046],[427,1098],[388,1098]],[[432,1046],[471,1046],[471,1098],[432,1098]],[[475,1046],[514,1046],[514,1098],[475,1098]],[[519,1046],[558,1046],[558,1098],[519,1098]],[[562,1046],[601,1046],[601,1098],[562,1098]]],"extras":[{"lm":"Overhang","poly":[[840,488],[905,488],[905,683],[840,683]]}],"walls":[[[66.0,529.0],[131.0,529.0],[131.0,535.0],[66.0,535.0]],[[169.0,529.0],[224.0,529.0],[224.0,535.0],[169.0,535.0]],[[218.0,529.0],[224.0,529.0],[224.0,651.0],[218.0,651.0]],[[218.0,683.0],[224.0,683.0],[224.0,804.0],[218.0,804.0]],[[85.0,798.0],[224.0,798.0],[224.0,804.0],[85.0,804.0]],[[85.0,703.0],[91.0,703.0],[91.0,804.0],[85.0,804.0]],[[66.0,703.0],[91.0,703.0],[91.0,709.0],[66.0,709.0]],[[66.0,529.0],[72.0,529.0],[72.0,709.0],[66.0,709.0]]],"foot":[[[233.0,109.0],[233.0,163.0],[154.0,163.0],[154.0,210.0],[239.0,210.0],[239.0,209.0],[291.0,209.0],[291.0,36.0],[240.0,36.0],[240.0,35.0],[153.0,35.0],[153.0,109.0]],[[390.0,98.0],[390.0,196.0],[667.0,196.0],[667.0,98.0]],[[52.0,496.0],[122.0,496.0],[122.0,464.0],[180.0,464.0],[180.0,260.0],[164.0,260.0],[164.0,229.0],[110.0,229.0],[110.0,260.0],[52.0,260.0]],[[497.0,242.0],[331.0,242.0],[331.0,338.0],[497.0,338.0],[497.0,298.0],[452.0,298.0],[452.0,285.0],[497.0,285.0]],[[565.0,312.0],[617.0,312.0],[617.0,368.0],[567.0,368.0],[567.0,441.0],[650.0,441.0],[650.0,379.0],[664.0,379.0],[664.0,425.0],[716.0,425.0],[716.0,380.0],[717.0,380.0],[717.0,330.0],[716.0,330.0],[716.0,260.0],[650.0,260.0],[650.0,235.0],[565.0,235.0]],[[860.0,223.0],[765.0,223.0],[765.0,401.0],[860.0,401.0]],[[368.0,377.0],[220.0,377.0],[220.0,473.0],[368.0,473.0]],[[998.0,334.0],[892.0,334.0],[892.0,436.0],[929.0,436.0],[929.0,421.0],[951.0,421.0],[951.0,436.0],[983.0,436.0],[983.0,409.0],[974.0,409.0],[974.0,396.0],[998.0,396.0]],[[521.0,695.0],[636.0,695.0],[636.0,559.0],[654.0,559.0],[654.0,491.0],[521.0,491.0]],[[359.0,994.4],[227.0,1022.5],[244.1,1102.6],[333.0,1083.8],[333.0,1104.0],[607.0,1104.0],[607.0,1003.0],[360.9,1003.0]]],"corr":[[[517,553],[658,553],[658,570],[517,570]],[[343,1036],[612,1036],[612,1048],[343,1048]]],"entrances":[{"name":"K Building entrance","cx":150,"cy":532,"poly":[[128,524],[172,524],[172,540],[128,540]]},{"name":"K Building entrance","cx":221,"cy":667,"poly":[[213,648],[229,648],[229,686],[213,686]]}],"stairs":[{"id":"KS1","bld":"K","name":"the stairs at the top of the K building","rect":[88,543,52,14],"cx":114.0,"cy":550.0},{"id":"KS2","bld":"K","name":"the stairs at the bottom of the K hallway","rect":[135,682,64,21],"cx":167.0,"cy":692.5},{"id":"US1","bld":"U","name":"the stairs at the left end of the U building","rect":[344,965,36,34],"cx":362.0,"cy":982.0},{"id":"US2","bld":"U","name":"the stairs at the right end of the U building","rect":[606,980,26,60],"cx":619.0,"cy":1010.0}]};
+var NS = "http://www.w3.org/2000/svg";
+var svg = document.getElementById("map");
+var wrap = document.getElementById("mapwrap");
+var hitsG = document.getElementById("hits");
+var routeG = document.getElementById("routeLayer");
+var selFrom = document.getElementById("from");
+var selTo = document.getElementById("to");
+
+function ord(n){ return n === 1 ? "1st" : "2nd"; }
+var rooms = {};
+DATA.rooms.forEach(function(r){ rooms[r.id] = r; });
+
+/* ---------- dropdowns ---------- */
+function fillSelect(sel){
+  var o = document.createElement("option"); o.value = ""; o.textContent = "Choose a room…"; sel.appendChild(o);
+  DATA.menu.forEach(function(g){
+    var og = document.createElement("optgroup"); og.label = g.group;
+    g.ids.forEach(function(id){
+      var op = document.createElement("option"); op.value = id; op.textContent = rooms[id].label + (rooms[id].floor ? " (" + ord(rooms[id].floor) + " floor)" : ""); og.appendChild(op);
+    });
+    sel.appendChild(og);
+  });
+}
+fillSelect(selFrom); fillSelect(selTo);
+
+/* ---------- doors, stairs, entrances ---------- */
+var extrasG = document.getElementById("extras");
+DATA.stairs.forEach(function(st){
+  var r = st.rect, g = document.createElementNS(NS, "g");
+  var rc = document.createElementNS(NS, "rect");
+  rc.setAttribute("x", r[0]); rc.setAttribute("y", r[1]); rc.setAttribute("width", r[2]); rc.setAttribute("height", r[3]);
+  rc.setAttribute("rx", 2); rc.setAttribute("fill", "#ffd84d"); rc.setAttribute("stroke", "#8a6d00"); rc.setAttribute("stroke-width", 1.5);
+  g.appendChild(rc);
+  var horiz = r[2] >= r[3], n = Math.floor((horiz ? r[2] : r[3]) / 6);
+  for (var i = 1; i < n; i++){
+    var ln = document.createElementNS(NS, "line");
+    if (horiz){ ln.setAttribute("x1", r[0] + i*6); ln.setAttribute("x2", r[0] + i*6); ln.setAttribute("y1", r[1]); ln.setAttribute("y2", r[1] + r[3]); }
+    else { ln.setAttribute("y1", r[1] + i*6); ln.setAttribute("y2", r[1] + i*6); ln.setAttribute("x1", r[0]); ln.setAttribute("x2", r[0] + r[2]); }
+    ln.setAttribute("stroke", "#8a6d00"); ln.setAttribute("stroke-width", 1);
+    g.appendChild(ln);
+  }
+  extrasG.appendChild(g);
+});
+DATA.entrances.forEach(function(en){
+  var c = document.createElementNS(NS, "circle");
+  c.setAttribute("cx", en.cx); c.setAttribute("cy", en.cy); c.setAttribute("r", 5);
+  c.setAttribute("fill", "#7c4dff"); c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", 1.6);
+  extrasG.appendChild(c);
+});
+DATA.rooms.forEach(function(r){
+  if (!r.door) return;
+  var c = document.createElementNS(NS, "circle");
+  c.setAttribute("cx", r.door[0]); c.setAttribute("cy", r.door[1]); c.setAttribute("r", 2.8);
+  c.setAttribute("fill", "#111"); c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", 1);
+  extrasG.appendChild(c);
+});
+
+/* ---------- clickable room overlays ---------- */
+var hitEls = {};
+DATA.rooms.forEach(function(r){
+  var p = document.createElementNS(NS, "polygon");
+  p.setAttribute("points", r.poly.map(function(q){ return q[0]+","+q[1]; }).join(" "));
+  p.setAttribute("class", "hit");
+  p.setAttribute("data-id", r.id);
+  var t = document.createElementNS(NS, "title"); t.textContent = r.label + (r.floor ? " (" + ord(r.floor) + " floor)" : ""); p.appendChild(t);
+  hitsG.appendChild(p);
+  hitEls[r.id] = p;
+});
+
+/* ---------- geometry helpers ---------- */
+function pip(x, y, poly){
+  var inside = false;
+  for (var i = 0, j = poly.length - 1; i < poly.length; j = i++){
+    var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function distSeg(px, py, ax, ay, bx, by){
+  var dx = bx-ax, dy = by-ay, l2 = dx*dx+dy*dy, t = l2 ? ((px-ax)*dx+(py-ay)*dy)/l2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  var cx = ax+t*dx, cy = ay+t*dy; return Math.hypot(px-cx, py-cy);
+}
+function distPoly(x, y, poly){
+  if (pip(x, y, poly)) return 0;
+  var m = Infinity;
+  for (var i = 0; i < poly.length; i++){
+    var a = poly[i], b = poly[(i+1) % poly.length];
+    m = Math.min(m, distSeg(x, y, a[0], a[1], b[0], b[1]));
+  }
+  return m;
+}
+function bbox(poly){
+  var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  poly.forEach(function(p){ x0=Math.min(x0,p[0]); y0=Math.min(y0,p[1]); x1=Math.max(x1,p[0]); y1=Math.max(y1,p[1]); });
+  return {x0:x0,y0:y0,x1:x1,y1:y1};
+}
+
+/* ---------- walkability grid ---------- */
+var CELL = 4, GW = Math.ceil(1440 / CELL), GH = Math.ceil(1150 / CELL), SOLID = 14;
+var solid = new Uint8Array(GW * GH);
+function rasterPoly(poly, fn, infl){
+  var b = bbox(poly);
+  var gx0 = Math.max(0, Math.floor((b.x0 - infl) / CELL)), gx1 = Math.min(GW-1, Math.ceil((b.x1 + infl) / CELL));
+  var gy0 = Math.max(0, Math.floor((b.y0 - infl) / CELL)), gy1 = Math.min(GH-1, Math.ceil((b.y1 + infl) / CELL));
+  for (var gy = gy0; gy <= gy1; gy++){
+    for (var gx = gx0; gx <= gx1; gx++){
+      var cx = (gx + .5) * CELL, cy = (gy + .5) * CELL;
+      if (pip(cx, cy, poly) ||
+          (infl && (pip(cx+infl, cy, poly) || pip(cx-infl, cy, poly) || pip(cx, cy+infl, poly) || pip(cx, cy-infl, poly)))){
+        fn(gy * GW + gx);
+      }
+    }
+  }
+}
+DATA.obst.forEach(function(poly){ rasterPoly(poly, function(i){ solid[i] = 1; }, 3.5); });
+var wallM = new Uint8Array(GW * GH);
+DATA.walls.forEach(function(poly){ rasterPoly(poly, function(i){ solid[i] = 1; wallM[i] = 1; }, 1.5); });
+var foot = new Uint8Array(GW * GH);
+DATA.foot.forEach(function(poly){ rasterPoly(poly, function(i){ foot[i] = 1; }, 0); });
+var near = new Uint8Array(GW * GH);
+(function(){
+  for (var gy = 0; gy < GH; gy++) for (var gx = 0; gx < GW; gx++){
+    if (!solid[gy*GW+gx]) continue;
+    for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++){
+      var x = gx+dx, y = gy+dy;
+      if (x>=0 && y>=0 && x<GW && y<GH) near[y*GW+x] = 1;
+    }
+  }
+})();
+var baseCost = new Float32Array(GW * GH);
+for (var i = 0; i < baseCost.length; i++) baseCost[i] = wallM[i] ? 400 : ((solid[i] || foot[i]) ? 300 : (near[i] ? 2.2 : 1));
+
+DATA.corr.forEach(function(poly){ rasterPoly(poly, function(i){ if (!wallM[i]) baseCost[i] = 1; }, 0); });
+
+function Heap(){ this.k = []; this.v = []; }
+Heap.prototype.push = function(key, val){
+  var k = this.k, v = this.v, i = k.length; k.push(key); v.push(val);
+  while (i > 0){ var p = (i-1) >> 1; if (k[p] <= key) break; k[i] = k[p]; v[i] = v[p]; i = p; }
+  k[i] = key; v[i] = val;
+};
+Heap.prototype.pop = function(){
+  var k = this.k, v = this.v, topV = v[0], lk = k.pop(), lv = v.pop(), n = k.length;
+  if (n > 0){
+    var i = 0;
+    while (true){
+      var l = 2*i+1, r = l+1, m = i, mk = lk;
+      if (l < n && k[l] < mk){ m = l; mk = k[l]; }
+      if (r < n && k[r] < mk){ m = r; mk = k[r]; }
+      if (m === i) break;
+      k[i] = k[m]; v[i] = v[m]; i = m;
+    }
+    k[i] = lk; v[i] = lv;
+  }
+  return topV;
+};
+Heap.prototype.size = function(){ return this.k.length; };
+
+function astar(s, e, cost){
+  var N = GW * GH, g = new Float32Array(N).fill(Infinity), came = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
+  var ex = e % GW, ey = (e / GW) | 0, h = new Heap();
+  g[s] = 0; h.push(0, s);
+  var D = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.4142],[1,-1,1.4142],[-1,1,1.4142],[-1,-1,1.4142]];
+  while (h.size()){
+    var c = h.pop();
+    if (closed[c]) continue; closed[c] = 1;
+    if (c === e) break;
+    var cx = c % GW, cy = (c / GW) | 0;
+    for (var d = 0; d < 8; d++){
+      var nx = cx + D[d][0], ny = cy + D[d][1];
+      if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      var n = ny * GW + nx;
+      if (closed[n]) continue;
+      if (D[d][2] > 1){
+        if (cost[cy*GW+nx] >= SOLID || cost[ny*GW+cx] >= SOLID) continue;
+      }
+      var ng = g[c] + D[d][2] * (cost[c] + cost[n]) / 2;
+      if (ng < g[n]){
+        g[n] = ng; came[n] = c;
+        var dx = Math.abs(nx - ex), dy = Math.abs(ny - ey);
+        var hh = (dx + dy) + (1.4142 - 2) * Math.min(dx, dy);
+        h.push(ng + hh, n);
+      }
+    }
+  }
+  if (!closed[e]) return null;
+  var path = [], cur = e;
+  while (cur !== -1){ path.push(cur); cur = came[cur]; }
+  return {cells:path.reverse(), g:g[e]};
+}
+
+function rdp(pts, eps, safe){
+  if (pts.length < 3) return pts;
+  var a = pts[0], b = pts[pts.length-1], md = 0, mi = 0;
+  for (var i = 1; i < pts.length - 1; i++){
+    var d = distSeg(pts[i].x, pts[i].y, a.x, a.y, b.x, b.y);
+    if (d > md){ md = d; mi = i; }
+  }
+  if (md > eps || (safe && !safe(a, b))){
+    if (mi < 1 || mi > pts.length - 2) mi = pts.length >> 1;
+    var l = rdp(pts.slice(0, mi+1), eps, safe), r = rdp(pts.slice(mi), eps, safe);
+    return l.slice(0, -1).concat(r);
+  }
+  return [a, b];
+}
+
+
+function pointOf(r){ return r.door ? {x:r.door[0], y:r.door[1]} : {x:r.cx, y:r.cy}; }
+function carve(cost, r){
+  if (!r.door) return;
+  var L = r.dcarve || 24;
+  for (var t = -2; t <= L; t += 2){
+    var x = r.door[0] + r.dout[0] * t, y = r.door[1] + r.dout[1] * t;
+    var gx = Math.floor(x / CELL), gy = Math.floor(y / CELL);
+    [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(function(o){
+      var xx = gx + o[0], yy = gy + o[1];
+      if (xx >= 0 && yy >= 0 && xx < GW && yy < GH) cost[yy*GW+xx] = 1;
+    });
+  }
+}
+function pathBetween(p0, p1, cost, excl){
+  var sx = Math.floor(p0.x / CELL), sy = Math.floor(p0.y / CELL), ex = Math.floor(p1.x / CELL), ey = Math.floor(p1.y / CELL);
+  var r = astar(sy*GW+sx, ey*GW+ex, cost);
+  if (!r) return null;
+  var pts = [{x:p0.x, y:p0.y}];
+  r.cells.forEach(function(c){
+    var cx = ((c % GW) + .5) * CELL, cy = (((c / GW) | 0) + .5) * CELL;
+    if (excl && excl.some(function(pl){ return pip(cx, cy, pl); })) return;
+    pts.push({x:cx, y:cy});
+  });
+  pts.push({x:p1.x, y:p1.y});
+  function los(a, b){
+    var dx = b.x-a.x, dy = b.y-a.y, d = Math.hypot(dx, dy), n = Math.max(1, Math.ceil(d / 2));
+    for (var i = 0; i <= n; i++){
+      var x = a.x + dx*i/n, y = a.y + dy*i/n;
+      if (cost[Math.floor(y / CELL)*GW + Math.floor(x / CELL)] >= 2) return false;
+    }
+    return true;
+  }
+  var res = [pts[0]], i = 0;
+  while (i < pts.length - 1){
+    var j = pts.length - 1;
+    while (j > i + 1 && !los(pts[i], pts[j])) j--;
+    res.push(pts[j]); i = j;
+  }
+  function safe(a, b){
+    var dx = b.x-a.x, dy = b.y-a.y, d = Math.hypot(dx, dy), n = Math.max(1, Math.ceil(d / 1.5));
+    for (var i = 0; i <= n; i++){
+      var x = a.x + dx*i/n, y = a.y + dy*i/n;
+      if (cost[Math.floor(y / CELL)*GW + Math.floor(x / CELL)] >= SOLID) return false;
+    }
+    return true;
+  }
+  return {poly:rdp(res, 2.5, safe), g:r.g};
+}
+function planRoute(A, B){
+  var cost = baseCost.slice();
+  [A, B].forEach(function(r){ carve(cost, r); });
+  DATA.stairs.forEach(function(st){
+    rasterPoly([[st.rect[0],st.rect[1]],[st.rect[0]+st.rect[2],st.rect[1]],[st.rect[0]+st.rect[2],st.rect[1]+st.rect[3]],[st.rect[0],st.rect[1]+st.rect[3]]], function(i){ cost[i] = 1; }, 2);
+  });
+  var ex = [];
+  if (A.door) ex.push(A.poly);
+  if (B.door) ex.push(B.poly);
+  var fa = A.floor || 1, fb = B.floor || 1;
+  var sameBld = A.bld && A.bld === B.bld && A.stairs && B.stairs && A.stairs.join() === B.stairs.join();
+  var needA = fa === 2 && !(fb === 2 && sameBld);
+  var needB = fb === 2 && !(fa === 2 && sameBld);
+  var pA = pointOf(A), pB = pointOf(B), legs = [], trans = [];
+  function stairsOf(room){ return DATA.stairs.filter(function(s){ return room.stairs && room.stairs.indexOf(s.id) >= 0; }); }
+  function sp(st){ return {x:st.cx, y:st.cy}; }
+  function fail(){ return null; }
+  if (!needA && !needB){
+    var one = pathBetween(pA, pB, cost, ex); if (!one) return fail();
+    legs.push(one.poly);
+  } else if (needA && needB){
+    var best = null;
+    stairsOf(A).forEach(function(s){
+      var l = pathBetween(pA, sp(s), cost, ex); if (!l) return;
+      var score = l.g + Math.hypot(s.cx - pB.x, s.cy - pB.y);
+      if (!best || score < best.score) best = {s:s, l:l, score:score};
+    });
+    if (!best) return fail();
+    var best2 = null;
+    stairsOf(B).forEach(function(s){
+      var m = pathBetween(sp(best.s), sp(s), cost, ex); if (!m) return;
+      var e = pathBetween(sp(s), pB, cost, ex); if (!e) return;
+      var score = m.g + e.g;
+      if (!best2 || score < best2.score) best2 = {s:s, m:m, e:e, score:score};
+    });
+    if (!best2) return fail();
+    legs.push(best.l.poly, best2.m.poly, best2.e.poly);
+    trans.push({dir:"down", stair:best.s}, {dir:"up", stair:best2.s});
+  } else {
+    var pick = null;
+    stairsOf(needA ? A : B).forEach(function(s){
+      var l1 = pathBetween(pA, sp(s), cost, ex); if (!l1) return;
+      var l2 = pathBetween(sp(s), pB, cost, ex); if (!l2) return;
+      var score = l1.g + l2.g;
+      if (!pick || score < pick.score) pick = {s:s, l1:l1, l2:l2, score:score};
+    });
+    if (!pick) return fail();
+    legs.push(pick.l1.poly, pick.l2.poly);
+    trans.push({dir:needA ? "down" : "up", stair:pick.s});
+  }
+  if (A.door) legs[0].unshift({x:A.cx, y:A.cy});
+  if (B.door) legs[legs.length-1].push({x:B.cx, y:B.cy});
+  var all = [];
+  legs.forEach(function(l){ l.forEach(function(p, i){ if (!(all.length && i === 0)) all.push(p); }); });
+  return {legs:legs, trans:trans, poly:all};
+}
+
+/* ---------- landmarks & directions ---------- */
+var lmPolys = {};
+DATA.rooms.forEach(function(r){ (lmPolys[r.lm] = lmPolys[r.lm] || []).push(r.poly); });
+DATA.extras.forEach(function(e){ (lmPolys[e.lm] = lmPolys[e.lm] || []).push(e.poly); });
+DATA.entrances.forEach(function(e){ (lmPolys[e.name] = lmPolys[e.name] || []).push(e.poly); });
+function lmName(n){ return "the " + n; }
+function joinList(a){
+  if (a.length <= 1) return a.join("");
+  return a.slice(0, -1).join(", ") + " and " + a[a.length-1];
+}
+function landmarksAlong(a, b, skip){
+  var d = Math.hypot(b.x-a.x, b.y-a.y), n = Math.max(1, Math.ceil(d / 8)), seen = [], out = [];
+  for (var i = 0; i <= n; i++){
+    var x = a.x + (b.x-a.x)*i/n, y = a.y + (b.y-a.y)*i/n;
+    for (var name in lmPolys){
+      if (skip[name] || seen.indexOf(name) >= 0) continue;
+      var polys = lmPolys[name];
+      for (var k = 0; k < polys.length; k++){
+        if (distPoly(x, y, polys[k]) < 22){ seen.push(name); out.push(name); break; }
+      }
+    }
+  }
+  return out;
+}
+function dirWord(ang){
+  var names = ["right","bottom-right","bottom","bottom-left","left","top-left","top","top-right"];
+  var idx = ((Math.round(ang / 45) % 8) + 8) % 8;
+  return "toward the " + names[idx] + " of the map";
+}
+function ang(a, b){ return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI; }
+function turn(a1, a2){ var t = a2 - a1; while (t > 180) t -= 360; while (t <= -180) t += 360; return t; }
+function buildMoves(poly, prefix, skip, told){
+  var V = [poly[0]], len = 0;
+  for (var i = 1; i < poly.length; i++){
+    var last = V[V.length-1], dd = Math.hypot(poly[i].x - last.x, poly[i].y - last.y);
+    len += dd;
+    if (dd >= 14 || i === poly.length - 1) V.push(poly[i]);
+  }
+  if (len < 14 || V.length < 2) return [];
+  while (V.length > 2 && Math.hypot(V[1].x - V[0].x, V[1].y - V[0].y) < 28) V.splice(1, 1);
+  var K = [V[0]];
+  for (var j = 1; j < V.length - 1; j++){
+    var t = turn(ang(K[K.length-1], V[j]), ang(V[j], V[j+1]));
+    if (Math.abs(t) >= 50) K.push(V[j]);
+  }
+  K.push(V[V.length-1]);
+  if (K.length > 2 && Math.hypot(K[1].x - K[0].x, K[1].y - K[0].y) < 60 && Math.abs(turn(ang(K[0], K[1]), ang(K[1], K[2]))) > 120) K.splice(1, 1);
+  var steps = [];
+  for (var s = 0; s < K.length - 1; s++){
+    var a = K[s], b = K[s+1], heading = ang(a, b);
+    var lms = landmarksAlong(a, b, skip).filter(function(n){ return !told[n]; }).slice(0, 3);
+    lms.forEach(function(n){ told[n] = 1; });
+    lms = lms.map(lmName);
+    var passing = lms.length ? ", passing " + joinList(lms) : "";
+    if (s === 0){
+      steps.push(prefix + dirWord(heading) + passing + ".");
+    } else {
+      var t2 = turn(ang(K[s-1], a), heading), side = t2 > 0 ? "right" : "left", at = Math.abs(t2);
+      var verb = at < 55 ? "Bear " + side : (at <= 135 ? "Turn " + side : "Turn around");
+      steps.push(verb + (lms.length ? " and continue" + passing : " and keep going") + ".");
+    }
+  }
+  return steps;
+}
+function buildSteps(plan, A, B){
+  var skip = {}; skip[A.lm] = 1; skip[B.lm] = 1;
+  var told = {}, steps = [];
+  plan.legs.forEach(function(leg, i){
+    var prefix;
+    if (i === 0) prefix = "Leave " + A.label + " and head ";
+    else prefix = plan.trans[i-1].dir === "down" ? "At the bottom of the stairs, head " : "At the top of the stairs, head ";
+    var mv = buildMoves(leg, prefix, skip, told);
+    if (!mv.length && i === 0) mv = ["Leave " + A.label + "."];
+    steps = steps.concat(mv);
+    if (plan.trans[i]){
+      var tr = plan.trans[i];
+      steps.push("Take " + tr.stair.name + " " + (tr.dir === "down" ? "down to the ground floor" : "up to the 2nd floor") + ".");
+    }
+  });
+  steps.push(B.floor === 2 ? "Arrive at " + B.label + " on the 2nd floor." : (B.floor === 1 ? "Arrive at " + B.label + " on the 1st floor." : "Arrive at " + B.label + "."));
+  return steps;
+}
+
+/* ---------- draw route ---------- */
+function el(tag, attrs){
+  var e = document.createElementNS(NS, tag);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function marker(x, y, color, label){
+  var g = el("g", {});
+  g.appendChild(el("circle", {cx:x, cy:y, r:11, fill:color, stroke:"#fff", "stroke-width":4}));
+  g.appendChild(el("circle", {cx:x, cy:y, r:4, fill:"#fff"}));
+  var w = label.length * 8.6 + 14;
+  var b = el("g", {transform:"translate(" + x + "," + (y - 36) + ")"});
+  b.appendChild(el("rect", {x:-w/2, y:-11, width:w, height:20, rx:6, fill:color, stroke:"#fff", "stroke-width":2}));
+  var t = el("text", {x:0, y:4, "text-anchor":"middle", "font-size":12, "font-weight":700, fill:"#fff", "font-family":"Arial,Helvetica,sans-serif"});
+  t.textContent = label; b.appendChild(t);
+  g.appendChild(b);
+  return g;
+}
+var lastBox = null;
+function drawRoute(plan, A, B){
+  var poly = plan.poly;
+  routeG.textContent = "";
+  var d = "M" + poly.map(function(p){ return p.x.toFixed(1) + " " + p.y.toFixed(1); }).join(" L");
+  routeG.appendChild(el("path", {d:d, fill:"none", stroke:"#fff", "stroke-width":11, "stroke-linecap":"round", "stroke-linejoin":"round", opacity:.95}));
+  routeG.appendChild(el("path", {d:d, fill:"none", stroke:"#1a5fd1", "stroke-width":6, "stroke-linecap":"round", "stroke-linejoin":"round"}));
+  var total = 0, idx = 0, nextAt = 20, STEP = 34;
+  for (var i = 0; i < poly.length - 1; i++){
+    var a = poly[i], b = poly[i+1], len = Math.hypot(b.x - a.x, b.y - a.y), ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+    while (nextAt <= total + len){
+      var f = (nextAt - total) / len, x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
+      var ar = el("polygon", {points:"-6,-6 6,0 -6,6 -2.5,0", "class":"arrow", transform:"translate(" + x.toFixed(1) + "," + y.toFixed(1) + ") rotate(" + ang.toFixed(1) + ")"});
+      ar.style.animationDelay = ((idx * 0.11) % 1.9).toFixed(2) + "s";
+      routeG.appendChild(ar); idx++; nextAt += STEP;
+    }
+    total += len;
+  }
+  var last = poly[poly.length-1], first = poly[0];
+  var ring = el("circle", {cx:last.x, cy:last.y, r:11, "class":"ring"});
+  routeG.appendChild(ring);
+  plan.trans.forEach(function(tr){
+    var g2 = el("g", {});
+    g2.appendChild(el("circle", {cx:tr.stair.cx, cy:tr.stair.cy, r:11, fill:"#ffd84d", stroke:"#8a6d00", "stroke-width":2.5}));
+    var tt = el("text", {x:tr.stair.cx, y:tr.stair.cy + 4.5, "text-anchor":"middle", "font-size":13, "font-weight":700, fill:"#5c4600", "font-family":"Arial,Helvetica,sans-serif"});
+    tt.textContent = tr.dir === "down" ? "▼" : "▲"; g2.appendChild(tt); routeG.appendChild(g2);
+  });
+  routeG.appendChild(marker(first.x, first.y, "#1e9e4a", "START"));
+  routeG.appendChild(marker(last.x, last.y, "#d93636", "END"));
+  var xs = poly.map(function(p){ return p.x; }), ys = poly.map(function(p){ return p.y; });
+  lastBox = {x0:Math.min.apply(null, xs), y0:Math.min.apply(null, ys), x1:Math.max.apply(null, xs), y1:Math.max.apply(null, ys)};
+  [A, B].forEach(function(r){ var bb = bbox(r.poly); lastBox.x0 = Math.min(lastBox.x0, bb.x0); lastBox.y0 = Math.min(lastBox.y0, bb.y0); lastBox.x1 = Math.max(lastBox.x1, bb.x1); lastBox.y1 = Math.max(lastBox.y1, bb.y1); });
+}
+
+/* ---------- pan / zoom ---------- */
+var view = {cx:735, cy:570, w:1400};
+var FULL = {cx:735, cy:575, w:1400};
+function aspect(){ var r = svg.getBoundingClientRect(); return (r.width > 0 && r.height > 0) ? r.width / r.height : 1.25; }
+function applyView(){
+  view.w = Math.max(260, Math.min(2000, view.w));
+  view.cx = Math.max(0, Math.min(1440, view.cx));
+  view.cy = Math.max(0, Math.min(1150, view.cy));
+  var h = view.w / aspect();
+  svg.setAttribute("viewBox", (view.cx - view.w/2).toFixed(1) + " " + (view.cy - h/2).toFixed(1) + " " + view.w.toFixed(1) + " " + h.toFixed(1));
+}
+function fitView(){
+  var a = aspect(), w = FULL.w, h = w / a;
+  if (h < 1130){ w = 1130 * a; }
+  view.cx = FULL.cx; view.cy = FULL.cy; view.w = Math.max(w, 1400); applyView();
+}
+function fitBox(b, pad){
+  var a = aspect(), bw = (b.x1 - b.x0) + 2*pad, bh = (b.y1 - b.y0) + 2*pad;
+  view.w = Math.max(bw, bh * a, 480);
+  view.cx = (b.x0 + b.x1) / 2; view.cy = (b.y0 + b.y1) / 2; applyView();
+}
+function zoomAt(clientX, clientY, newW){
+  var r = svg.getBoundingClientRect(), sc = r.width / view.w;
+  var px = view.cx + (clientX - r.left - r.width/2) / sc, py = view.cy + (clientY - r.top - r.height/2) / sc;
+  view.w = Math.max(260, Math.min(2000, newW));
+  var sc2 = r.width / view.w;
+  view.cx = px - (clientX - r.left - r.width/2) / sc2;
+  view.cy = py - (clientY - r.top - r.height/2) / sc2;
+  applyView();
+}
+function zoomCenter(f){
+  var r = svg.getBoundingClientRect(); zoomAt(r.left + r.width/2, r.top + r.height/2, view.w * f);
+}
+var ptrs = {}, nPtr = 0, drag = null, pinch = null;
+svg.addEventListener("pointerdown", function(e){
+  try { svg.setPointerCapture(e.pointerId); } catch(_){}
+  ptrs[e.pointerId] = {x:e.clientX, y:e.clientY}; nPtr = Object.keys(ptrs).length;
+  if (nPtr === 1){
+    drag = {sx:e.clientX, sy:e.clientY, cx:view.cx, cy:view.cy, moved:false, target:e.target};
+  } else if (nPtr === 2){
+    var k = Object.keys(ptrs), p1 = ptrs[k[0]], p2 = ptrs[k[1]];
+    pinch = {d0:Math.hypot(p1.x-p2.x, p1.y-p2.y), w0:view.w, mx:(p1.x+p2.x)/2, my:(p1.y+p2.y)/2};
+    if (drag) drag.moved = true;
+  }
+});
+svg.addEventListener("pointermove", function(e){
+  if (!ptrs[e.pointerId]) return;
+  ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+  if (nPtr >= 2 && pinch){
+    var k = Object.keys(ptrs), p1 = ptrs[k[0]], p2 = ptrs[k[1]];
+    var d = Math.hypot(p1.x-p2.x, p1.y-p2.y), mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
+    var r = svg.getBoundingClientRect(), sc = r.width / view.w;
+    view.cx -= (mx - pinch.mx) / sc; view.cy -= (my - pinch.my) / sc;
+    pinch.mx = mx; pinch.my = my;
+    if (d > 10) zoomAt(mx, my, pinch.w0 * pinch.d0 / d);
+    return;
+  }
+  if (drag){
+    var dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+    if (!drag.moved && Math.hypot(dx, dy) > 6){ drag.moved = true; svg.classList.add("dragging"); }
+    if (drag.moved){
+      var r2 = svg.getBoundingClientRect(), sc2 = r2.width / view.w;
+      view.cx = drag.cx - dx / sc2; view.cy = drag.cy - dy / sc2; applyView();
+    }
+  }
+});
+function endPtr(e){
+  if (!ptrs[e.pointerId]) return;
+  delete ptrs[e.pointerId]; nPtr = Object.keys(ptrs).length;
+  if (nPtr < 2) pinch = null;
+  if (nPtr === 0){
+    svg.classList.remove("dragging");
+    if (drag && !drag.moved && e.type === "pointerup"){
+      var id = drag.target && drag.target.getAttribute && drag.target.getAttribute("data-id");
+      if (id && rooms[id]) pickRoom(id);
+    }
+    drag = null;
+  } else if (nPtr === 1){
+    var k = Object.keys(ptrs)[0];
+    drag = {sx:ptrs[k].x, sy:ptrs[k].y, cx:view.cx, cy:view.cy, moved:true, target:null};
+  }
+}
+svg.addEventListener("pointerup", endPtr);
+svg.addEventListener("pointercancel", endPtr);
+svg.addEventListener("wheel", function(e){
+  e.preventDefault();
+  zoomAt(e.clientX, e.clientY, view.w * Math.exp(e.deltaY * 0.0015));
+}, {passive:false});
+document.getElementById("zin").onclick = function(){ zoomCenter(0.7); };
+document.getElementById("zout").onclick = function(){ zoomCenter(1.4); };
+document.getElementById("zall").onclick = fitView;
+document.getElementById("zroute").onclick = function(){ if (lastBox) fitBox(lastBox, 90); };
+window.addEventListener("resize", applyView);
+
+/* ---------- state ---------- */
+var fromId = "", toId = "", active = "from";
+var tapHint = document.getElementById("tapHint");
+var stepsEl = document.getElementById("steps");
+var emptyEl = document.getElementById("empty");
+var summaryEl = document.getElementById("summary");
+
+function updateHits(){
+  for (var id in hitEls){
+    var c = "hit";
+    if (id === fromId) c += " from";
+    if (id === toId) c += " to";
+    hitEls[id].setAttribute("class", c);
+  }
+}
+function updateHint(){
+  var next = !fromId ? "from" : (!toId ? "to" : active);
+  tapHint.innerHTML = "Tip: tap a room on the map to set your <b>" + (next === "from" ? "starting point" : "destination") + "</b>.";
+}
+function clearRoute(msg, isErr){
+  routeG.textContent = ""; lastBox = null; stepsEl.textContent = "";
+  summaryEl.textContent = "";
+  emptyEl.style.display = ""; emptyEl.textContent = msg || "Pick a starting point and a destination to see the route and step-by-step directions.";
+  emptyEl.className = "empty" + (isErr ? " err" : "");
+}
+function setHash(){
+  try {
+    var h = (fromId || toId) ? "#from=" + encodeURIComponent(fromId) + "&to=" + encodeURIComponent(toId) : "";
+    history.replaceState(null, "", location.pathname + location.search + h);
+  } catch(_){}
+}
+function refresh(fit){
+  selFrom.value = fromId; selTo.value = toId;
+  updateHits(); updateHint(); setHash();
+  if (!fromId || !toId){
+    clearRoute();
+    return;
+  }
+  if (fromId === toId){ clearRoute("Those are the same place — you’re already there!", false); return; }
+  var A = rooms[fromId], B = rooms[toId], plan = planRoute(A, B);
+  if (!plan){ clearRoute("Sorry, we couldn’t find a route between those two places.", true); return; }
+  drawRoute(plan, A, B);
+  var steps = buildSteps(plan, A, B);
+  stepsEl.textContent = "";
+  steps.forEach(function(s, i){
+    var li = document.createElement("li"); li.textContent = s;
+    if (i === steps.length - 1) li.className = "arrive";
+    stepsEl.appendChild(li);
+  });
+  emptyEl.style.display = "none";
+  summaryEl.textContent = A.label + (A.floor ? " (" + ord(A.floor) + " floor)" : "") + " → " + B.label + (B.floor ? " (" + ord(B.floor) + " floor)" : "");
+  if (fit) fitBox(lastBox, 90);
+}
+function pickRoom(id){
+  var target = !fromId ? "from" : (!toId ? "to" : active);
+  if (target === "from") fromId = id; else toId = id;
+  active = target === "from" ? "to" : "from";
+  refresh(true);
+}
+selFrom.addEventListener("change", function(){ fromId = selFrom.value; active = "to"; refresh(true); });
+selTo.addEventListener("change", function(){ toId = selTo.value; active = "from"; refresh(true); });
+document.getElementById("swap").onclick = function(){ var t = fromId; fromId = toId; toId = t; refresh(true); };
+document.getElementById("clear").onclick = function(){ fromId = ""; toId = ""; active = "from"; refresh(false); fitView(); };
+
+window.__wf = {planRoute:planRoute, rooms:rooms, DATA:DATA, pip:pip, baseCost:baseCost, GW:GW, CELL:CELL};
+
+/* ---------- start ---------- */
+try {
+  var m = /from=([^&]*)&to=([^&]*)/.exec(location.hash || "");
+  if (m){
+    var f = decodeURIComponent(m[1]), t = decodeURIComponent(m[2]);
+    if (rooms[f]) fromId = f;
+    if (rooms[t]) toId = t;
+  }
+} catch(_){}
+fitView();
+refresh(false);
+if (fromId && toId && lastBox) fitBox(lastBox, 90);
+})();
+</script>
+</body>
+</html>
