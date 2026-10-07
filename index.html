@@ -27,15 +27,17 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
   font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-.app{max-width:1320px;margin:0 auto;padding:16px}
+.app{max-width:1180px;margin:0 auto;padding:16px}
 header h1{font-size:1.45rem;line-height:1.2;margin:0 0 4px}
 header p{margin:0;color:var(--muted)}
 .layout{display:grid;gap:14px;margin-top:14px;grid-template-columns:minmax(0,1fr);
   grid-template-areas:"controls" "map" "steps"}
-@media (min-width:980px){
-  .layout{grid-template-columns:370px minmax(0,1fr);grid-template-areas:"controls map" "steps map";align-items:start}
-  .mapcard{position:sticky;top:12px}
-}
+.pair{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media (min-width:720px){.pair{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}}
+.pair label{margin:0 0 5px}
+.controls .btnrow{justify-content:center}
+.controls .btn{flex:0 1 180px}
+.controls .tap{text-align:center}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
 .controls{grid-area:controls}.mapcard{grid-area:map}.stepscard{grid-area:steps}
 label{display:flex;align-items:center;gap:8px;font-weight:650;font-size:.92rem;margin:12px 0 5px}
@@ -53,7 +55,7 @@ button{font:inherit;cursor:pointer}
 .tap b{color:var(--ink)}
 .mapwrap{position:relative;height:min(70vh,640px);min-height:340px;background:#fff;border:1px solid var(--line);
   border-radius:10px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
-@media (min-width:980px){.mapwrap{height:min(82vh,860px)}}
+@media (min-width:980px){.mapwrap{height:min(78vh,800px)}}
 #map{display:block;width:100%;height:100%;cursor:grab}
 #map.dragging{cursor:grabbing}
 .zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
@@ -102,10 +104,16 @@ ol#steps li.arrive::before{content:"\2713";background:var(--end);color:#fff}
 
   <div class="layout">
     <section class="card controls" aria-label="Choose your route">
-      <label for="from"><span class="dot s"></span> Starting class / location</label>
-      <select id="from"></select>
-      <label for="to"><span class="dot e"></span> Ending class / location</label>
-      <select id="to"></select>
+      <div class="pair">
+        <div>
+          <label for="from"><span class="dot s"></span> Starting class / location</label>
+          <select id="from"></select>
+        </div>
+        <div>
+          <label for="to"><span class="dot e"></span> Ending class / location</label>
+          <select id="to"></select>
+        </div>
+      </div>
       <div class="btnrow">
         <button class="btn" id="swap" type="button">⇅ Swap</button>
         <button class="btn" id="clear" type="button">Clear</button>
